@@ -1,6 +1,13 @@
 .Rproj.user
 .Rhistory
-.DS_store
 .RData
+.Ruserdata
 .DS_Store
 *.tar.gz
+*.Rcheck/
+inst/doc
+vignettes/*.html
+vignettes/*.R
+docs/
+# never commit solver licences
+*.lic

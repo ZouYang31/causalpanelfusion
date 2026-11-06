@@ -1,0 +1,32 @@
+test_that("in-space placebo test and RMSPE ratio test", {
+  fit <- small_fit()
+  pl <- placebo_test(fit, progress = FALSE)
+  expect_s3_class(pl, "scfusion_placebo")
+  n <- nrow(fit$data$target)
+  expect_equal(nrow(pl$estimates), n)
+  expect_equal(sum(pl$estimates$role == "treated"), 1L)
+  expect_equal(pl$estimates$average_gap[1], fit$estimate)
+  rt <- rmspe_test(pl)
+  expect_s3_class(rt, "scfusion_rmspe")
+  expect_true(rt$p_value > 0 && rt$p_value <= 1)
+  expect_equal(rt$p_value, rt$rank / n)
+  expect_output(print(rt), "p-value")
+  expect_s3_class(plot(pl), "ggplot")
+  expect_s3_class(plot(pl, domain = "reference"), "ggplot")
+  expect_s3_class(plot(rt), "ggplot")
+})
+
+test_that("rmspe_test on a fit excludes the treated unit by default", {
+  fit <- small_fit()
+  rt <- rmspe_test(fit, progress = FALSE)
+  expect_true(rt$exclude_treated)
+})
+
+test_that("leave-one-out drops each positive-weight donor once", {
+  fit <- small_fit()
+  loo <- placebo_test(fit, type = "leave_one_out", progress = FALSE)
+  expect_equal(nrow(loo$estimates), 1L + sum(fit$weights > 0))
+  expect_equal(loo$estimates$unit[1], "(all donors)")
+  expect_output(print(loo), "Leave-one-out")
+  expect_error(rmspe_test(loo), "in-space")
+})

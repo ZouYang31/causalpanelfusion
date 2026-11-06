@@ -1,0 +1,17 @@
+bibentry(
+  bibtype = "Misc",
+  title = "Causal Data Fusion for Panel Data without a Pre-Intervention Period",
+  author = c(person("Zou", "Yang"), person("Seung Hee", "Lee"),
+             person("Julia R.", "Köhler"), person("AmirEmad", "Ghassami")),
+  year = "2024",
+  eprint = "2410.16391",
+  archivePrefix = "arXiv",
+  primaryClass = "stat.ME",
+  doi = "10.48550/arXiv.2410.16391",
+  url = "https://arxiv.org/abs/2410.16391",
+  textVersion = paste(
+    "Yang, Z., Lee, S. H., Köhler, J. R. and Ghassami, A. (2024).",
+    "Causal data fusion for panel data without a pre-intervention period.",
+    "arXiv:2410.16391."
+  )
+)

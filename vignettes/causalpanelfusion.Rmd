@@ -1,0 +1,186 @@
+---
+title: "Getting started with causalpanelfusion"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with causalpanelfusion}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7,
+                      fig.height = 4.2)
+```
+
+## The problem
+
+A single unit receives an intervention and we want its effect, but the
+outcome of interest (the **target domain**) is only observed *after* the
+intervention: there is no pre-intervention period to build a synthetic
+control from. What we do have is a related **reference domain** observed for
+the same units and untouched by the intervention (in the paper's
+application: vaccination rates of a different subpopulation of the same
+cities). `causalpanelfusion` fuses the two domains.
+
+The inputs are four matrices with one row per unit:
+
+| argument    | paper | content                                    |
+|-------------|-------|--------------------------------------------|
+| `target`    | $Y$   | target-domain outcomes (units × periods)    |
+| `reference` | $F$   | reference-domain outcomes (units × periods) |
+| `X`         | $X$   | target-domain covariates                    |
+| `Z`         | $Z$   | reference-domain covariates                 |
+
+We simulate data from the factor model used in the paper's simulation study
+(with a smaller budget grid below to keep the vignette fast).
+
+```{r}
+library(causalpanelfusion)
+sim <- simulate_fusion_data(n_units = 21, seed = 45)
+dim(sim$target)
+dim(sim$reference)
+sim$psi   # true average effect on the treated unit
+```
+
+## Synthetic control data fusion
+
+`scfusion()` learns donor weights in the reference domain with the paper's
+data-driven constrained optimisation: covariate balance in both domains is
+kept within a slack `eta_Z`, `eta_X` of the best attainable balance, and the
+budget $b = (b_F, b_Z, b_X)$ trading off the three fit criteria is selected
+from a grid. The weights are then transported to the target domain.
+
+```{r}
+fit <- scfusion(sim$target, sim$reference, X = sim$X, Z = sim$Z,
+                budget_step = 0.05)
+fit
+```
+
+`summary()` adds per-period effects, the selected budget, the fit criteria
+and a covariate-balance table.
+
+```{r}
+summary(fit)
+```
+
+```{r}
+plot(fit)                       # target domain
+plot(fit, type = "reference")   # reference domain (where weights are fit)
+```
+
+The default grid (`budget_step = 0.01`, 4,796 candidates) matches the paper.
+The optimisation uses the free ECOS solver; `solver = "gurobi"` reproduces
+the original implementation if you have a Gurobi licence.
+
+## Prediction intervals
+
+`scfusion_pi()` decomposes the error into the weight-construction error
+(bootstrap refits of the whole algorithm in the reference domain) and the
+transfer error (calibrated from donor placebos in the target domain), and
+reports Approach 2 (location-scale, Gaussian and empirical) and Approach 1
+(sub-Gaussian) intervals at level `1 - alpha1 - alpha2`.
+
+```{r}
+pi <- scfusion_pi(fit, B = 100, seed = 1, progress = FALSE)
+pi
+```
+
+Use `B = 500` (the default) for reported results. Each refit repeats the
+budget search, so this is the slow step; run the refits in parallel with
+
+```{r, eval = FALSE}
+future::plan(future::multisession)
+pi <- scfusion_pi(fit, parallel = TRUE, seed = 1)
+```
+
+The results are identical to the serial run. `budget_step = 0.05` (refits
+only) or `reselect_budget = FALSE` give faster approximations.
+
+Pointwise per-period bands:
+
+```{r}
+bands <- pi_bands(pi, method = "gaussian")
+bands[, c("period", "treated", "synthetic", "total_lo", "total_hi",
+          "effect", "effect_lo", "effect_hi")]
+plot(pi)                      # bands on the synthetic control
+plot(pi, type = "effect")     # per-period effects
+```
+
+Because the transfer error is not identified nonparametrically,
+`sensitivity_pi()` traces the interval as its scale is multiplied by
+$\rho$:
+
+```{r}
+sens <- sensitivity_pi(pi)
+sens
+plot(sens)
+```
+
+## Diagnostics
+
+In-space placebos re-run the algorithm with every donor as a pseudo-treated
+unit; the RMSPE-ratio test turns them into an exact placebo p-value, using
+the reference-domain fit as the "pre-period".
+
+```{r}
+pl <- placebo_test(fit, progress = FALSE)
+plot(pl)
+rmspe_test(fit, progress = FALSE)
+```
+
+The leave-one-out check drops each positive-weight donor in turn:
+
+```{r}
+loo <- placebo_test(fit, type = "leave_one_out", progress = FALSE)
+loo
+```
+
+Sensitivity of the estimate to the balance slack:
+
+```{r}
+es <- eta_sensitivity(fit, eta_Z = c(0.05, 0.1, 0.2), eta_X = c(0.05, 0.1, 0.2),
+                      progress = FALSE)
+es[, c("eta_Z", "eta_X", "estimate", "NSE_F", "n_donors")]
+plot(es)
+```
+
+## Equi-confounding data fusion
+
+The paper's second method anchors the target-domain confounding bias at the
+reference-domain bias, either additively (linear) or multiplicatively
+(logarithmic):
+
+```{r}
+ec <- equi_confounding(sim$target, sim$reference)
+ec
+plot(ec)
+```
+
+## Using your own data
+
+Long-format panels are converted with `panel_to_matrix()` and covariates
+with `covariate_matrix()`. Rows are matched by unit name, so the treated
+unit can be given by name. For example, with one file of monthly outcomes
+(columns `unit`, `group`, `month`, `rate`) and one file of covariates:
+
+```{r, eval = FALSE}
+outcomes <- read.csv("monthly_outcomes.csv")
+covs <- read.csv("covariates.csv")
+
+ref <- subset(outcomes, group == "reference")
+tgt <- subset(outcomes, group == "target")
+Fm <- panel_to_matrix(ref, unit = "unit", time = "month", outcome = "rate")
+Y  <- panel_to_matrix(tgt, unit = "unit", time = "month", outcome = "rate")
+vars <- c("median_income", "median_age", "proportion")
+Z <- covariate_matrix(subset(covs, group == "reference"), "unit", vars,
+                      normalize = TRUE)
+X <- covariate_matrix(subset(covs, group == "target"), "unit", vars,
+                      normalize = TRUE)
+
+fit <- scfusion(Y, Fm, X = X, Z = Z, treated = "Chelsea")
+```
+
+## Reference
+
+Yang, Z., Lee, S. H., Köhler, J. R. and Ghassami, A. Causal data fusion for
+panel data without a pre-intervention period. arXiv:2410.16391.
