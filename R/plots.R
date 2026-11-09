@@ -263,7 +263,8 @@ plot.scfusion_eta <- function(x, value = "estimate", ...) {
     ggplot2::scale_fill_gradient(low = "#EAF2FB", high = "#6BAED6",
                                  name = value) +
     ggplot2::labs(x = expression(eta[X]), y = expression(eta[Z])) +
-    .cpf_theme()
+    .cpf_theme() +
+    ggplot2::theme(legend.position = "right")
 }
 
 #' Plot the transfer-scale sensitivity analysis

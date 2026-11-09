@@ -8,7 +8,7 @@
 #'   \item{Linear}{\eqn{\hat\psi = (\bar Y_1 - \bar Y_0) - (\bar F_1 - \bar
 #'     F_0)}, a difference-in-differences across domains.}
 #'   \item{Logarithmic}{\eqn{\hat\psi = \bar Y_1 - (\bar F_1 / \bar F_0)\,\bar
-#'     Y_0}, i.e. equal ratios across domains (outcomes must be positive).}
+#'     Y_0}, i.e. equal ratios across domains (average outcomes must be positive).}
 #' }
 #' Here \eqn{\bar Y_1}, \eqn{\bar F_1} average the treated unit's target and
 #' reference outcomes over time and \eqn{\bar Y_0}, \eqn{\bar F_0} average
@@ -60,11 +60,9 @@ equi_confounding <- function(target, reference, treated = 1L,
     linear = (means[["Y1"]] - means[["Y0"]]) - (means[["F1"]] - means[["F0"]]),
     log = means[["Y1"]] - (means[["F1"]] / means[["F0"]]) * means[["Y0"]]
   )
-  if (type == "log" || type == "both") {
-    if (means[["F0"]] <= 0 || any(c(Y, Fm) <= 0)) {
-      warning("The logarithmic estimator assumes positive outcomes.",
-              call. = FALSE)
-    }
+  if ((type == "log" || type == "both") && any(means <= 0)) {
+    warning("The logarithmic estimator needs positive average outcomes.",
+            call. = FALSE)
   }
   if (type != "both") est <- est[type]
   structure(list(estimate = est, means = means,

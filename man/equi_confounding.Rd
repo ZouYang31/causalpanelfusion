@@ -39,7 +39,7 @@ domain:
 \item{Linear}{\eqn{\hat\psi = (\bar Y_1 - \bar Y_0) - (\bar F_1 - \bar
     F_0)}, a difference-in-differences across domains.}
 \item{Logarithmic}{\eqn{\hat\psi = \bar Y_1 - (\bar F_1 / \bar F_0)\,\bar
-    Y_0}, i.e. equal ratios across domains (outcomes must be positive).}
+    Y_0}, i.e. equal ratios across domains (average outcomes must be positive).}
 }
 Here \eqn{\bar Y_1}, \eqn{\bar F_1} average the treated unit's target and
 reference outcomes over time and \eqn{\bar Y_0}, \eqn{\bar F_0} average

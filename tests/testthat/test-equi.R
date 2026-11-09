@@ -13,3 +13,11 @@ test_that("equi-confounding estimators follow the paper's formulas", {
   expect_output(print(ec), "linear")
   expect_s3_class(plot(ec), "ggplot")
 })
+
+test_that("zeros in individual outcomes do not trigger the log warning", {
+  sim <- small_sim()
+  Y <- sim$target
+  Y[3, 1] <- 0
+  expect_no_warning(equi_confounding(Y, sim$reference))
+  expect_warning(equi_confounding(Y - 1000, sim$reference), "positive")
+})
