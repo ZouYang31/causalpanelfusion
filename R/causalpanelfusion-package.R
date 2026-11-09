@@ -8,7 +8,7 @@
 #' Main functions:
 #' \itemize{
 #'   \item [scfusion()]: synthetic control data fusion (data-driven
-#'     constrained weights).
+#'     constrained weights); [covariate_balance()] for the balance table.
 #'   \item [scfusion_pi()], [pi_bands()]: prediction intervals for the
 #'     average effect and pointwise per-period bands.
 #'   \item [placebo_test()], [rmspe_test()]: in-space placebo,

@@ -17,6 +17,10 @@ methods of the paper.
   the transfer error.
 * `placebo_test()` (in-space and leave-one-out) and `rmspe_test()`
   (RMSPE-ratio placebo p-value).
+* `covariate_balance()` reports the covariate balance table (treated unit,
+  synthetic control, donor pool summaries, gaps on the reported and fitting
+  scales, rank of the treated unit) in the original units of the covariates,
+  optionally side by side with other fits.
 * `eta_sensitivity()` refits over a grid of balance slacks.
 * `equi_confounding()` returns the linear and logarithmic estimators together
   with a `plot()` method for the equi-confounding diagram.

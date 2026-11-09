@@ -130,6 +130,7 @@ data fusion for panel data without a pre-intervention period.
 arXiv:2410.16391.
 }
 \seealso{
+\code{\link[=covariate_balance]{covariate_balance()}} for the covariate balance table,
 \code{\link[=scfusion_pi]{scfusion_pi()}} for prediction intervals, \code{\link[=placebo_test]{placebo_test()}},
 \code{\link[=eta_sensitivity]{eta_sensitivity()}}, \code{\link[=equi_confounding]{equi_confounding()}}.
 }

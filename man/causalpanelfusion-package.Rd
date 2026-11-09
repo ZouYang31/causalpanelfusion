@@ -15,7 +15,7 @@ from a related reference domain observed for the same units.
 Main functions:
 \itemize{
 \item \code{\link[=scfusion]{scfusion()}}: synthetic control data fusion (data-driven
-constrained weights).
+constrained weights); \code{\link[=covariate_balance]{covariate_balance()}} for the balance table.
 \item \code{\link[=scfusion_pi]{scfusion_pi()}}, \code{\link[=pi_bands]{pi_bands()}}: prediction intervals for the
 average effect and pointwise per-period bands.
 \item \code{\link[=placebo_test]{placebo_test()}}, \code{\link[=rmspe_test]{rmspe_test()}}: in-space placebo,

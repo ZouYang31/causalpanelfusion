@@ -68,6 +68,26 @@ plot(fit)                       # target domain
 plot(fit, type = "reference")   # reference domain (where weights are fit)
 ```
 
+`covariate_balance()` gives the covariate balance table: the treated unit,
+its synthetic control and the donor pool for every covariate in both
+domains, the rank of the treated unit among all units, and (in the footer)
+how the fitted discrepancies compare with the best attainable values and the
+limits allowed by `eta_Z` and `eta_X`.
+
+```{r}
+covariate_balance(fit)
+```
+
+When the weights are fitted on normalised covariates, pass the covariates in
+their original units through `X` and `Z` to report the table in those units;
+`compare` adds the synthetic values of other fits as extra columns:
+
+```{r}
+fit_tight <- scfusion(sim$target, sim$reference, X = sim$X, Z = sim$Z,
+                      eta_X = 0.01, budget_step = 0.05)
+covariate_balance(fit, compare = list(eta_X_0.01 = fit_tight))
+```
+
 The default grid (`budget_step = 0.01`, 4,796 candidates) matches the paper.
 The optimisation uses the free ECOS solver; `solver = "gurobi"` reproduces
 the original implementation if you have a Gurobi licence.

@@ -16,7 +16,7 @@ It implements the methods of
 |---|---|
 | **Synthetic control data fusion** | `scfusion()`: donor weights from a data-driven constrained optimisation in the reference domain, transported to the target domain |
 | **Prediction intervals** | `scfusion_pi()`, `pi_bands()`: bootstrap of the weight-construction error + donor-placebo calibration of the transfer error (location-scale and sub-Gaussian constructions), average and per-period |
-| **Diagnostics** | `placebo_test()` (in-space, leave-one-out), `rmspe_test()`, `eta_sensitivity()`, `sensitivity_pi()` |
+| **Diagnostics** | `covariate_balance()`, `placebo_test()` (in-space, leave-one-out), `rmspe_test()`, `eta_sensitivity()`, `sensitivity_pi()` |
 | **Equi-confounding data fusion** | `equi_confounding()`: linear and logarithmic estimators |
 | **Utilities** | `simulate_fusion_data()`, `panel_to_matrix()`, `covariate_matrix()`, `normalize_minmax()` |
 
@@ -103,6 +103,36 @@ reference domain where the weights were fitted:
 Useful options: `eta_Z`, `eta_X` (balance slack, default 0.1),
 `budget_step` (grid spacing, default 0.01), `solver` (`"ecos"` or
 `"gurobi"`).
+
+**Covariate balance.** `covariate_balance()` compares the treated unit with
+its synthetic control and the donor pool on every covariate, in both
+domains:
+
+```r
+covariate_balance(fit)
+#> Covariate balance: treated vs its synthetic control (fitting-scale units)
+#>
+#>         domain covariate treated synthetic donor_mean donor_min donor_max      gap treated_rank
+#>  reference (Z)        Z1  0.8072    0.8848     0.5717  0.004897    0.9856 -0.07761           10
+#>  reference (Z)        Z2  0.9783    0.7569     0.5139   0.05591    0.8899   0.2214            1
+#>  reference (Z)        Z3  0.7103    0.5408     0.4158   0.02047    0.9998   0.1695            9
+#>     target (X)        X1  0.6351    0.6565     0.4451  0.006789    0.9892  -0.0214           11
+#>     target (X)        X2   0.911    0.7004     0.5371   0.01903    0.9955   0.2106            6
+#>     target (X)        X3  0.2693    0.3701     0.4291   0.03893    0.8215  -0.1009           21
+#>
+#> treated_rank: 1 = largest of 31 units.
+#> Fitting-scale discrepancy NSE (fitted | best attainable | allowed):
+#>   reference: 0.0279 | 0.00333 | 0.104
+#>   target:    0.0183 | 8.8e-05 | 0.1
+```
+
+`treated_rank` flags covariates on which the treated unit sits at the edge
+of the donor pool (rank 1 = largest), where no weighted average of donors can
+match it closely. The footer compares the fitted discrepancies with the best
+attainable values and the limits allowed by `eta_Z` and `eta_X`. Pass
+covariates in their original units through `X` and `Z` to report the table
+in those units, and other fits through `compare` to show them side by side
+(see [Using your own data](#using-your-own-data)).
 
 ### 2. Prediction intervals
 
@@ -246,7 +276,23 @@ fit <- scfusion(target, reference, X = X, Z = Z, treated = "unit_A")
 ```
 
 `normalize = TRUE` min-max scales each covariate to [0, 1], as in the paper,
-so that covariates on different scales are balanced comparably.
+so that covariates on different scales are balanced comparably. To read the
+covariate balance in the original units, build the same matrices without
+normalising and pass them to `covariate_balance()`; `compare` adds the
+synthetic values of other fits as extra columns:
+
+```r
+X_raw <- covariate_matrix(subset(covariates, domain == "target"),
+                          unit = "unit", covariates = vars)
+Z_raw <- covariate_matrix(subset(covariates, domain == "reference"),
+                          unit = "unit", covariates = vars)
+covariate_balance(fit, X = X_raw, Z = Z_raw)
+
+fit_tight <- scfusion(target, reference, X = X, Z = Z, treated = "unit_A",
+                      eta_X = 0.01)
+covariate_balance(fit, X = X_raw, Z = Z_raw,
+                  compare = list(eta_X_0.01 = fit_tight))
+```
 
 See `vignette("causalpanelfusion")` for a longer walk-through.
 

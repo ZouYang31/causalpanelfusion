@@ -80,7 +80,8 @@
 #'   data fusion for panel data without a pre-intervention period.
 #'   arXiv:2410.16391.
 #'
-#' @seealso [scfusion_pi()] for prediction intervals, [placebo_test()],
+#' @seealso [covariate_balance()] for the covariate balance table,
+#'   [scfusion_pi()] for prediction intervals, [placebo_test()],
 #'   [eta_sensitivity()], [equi_confounding()].
 #'
 #' @examples
