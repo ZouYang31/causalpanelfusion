@@ -46,7 +46,12 @@ untreated target-domain outcomes (known in simulations, e.g.
 "Donor pool units" and "Counterfactual \if{html}{\out{<name>}}".}
 
 \item{band_labels}{Optional labels for the two bands,
-\code{c(insample = , total = )}.}
+\code{c(insample = , total = )}. The blue \code{insample} band covers the
+weight-construction error only (level \eqn{1 - \alpha_1}); the red
+\code{total} band is the prediction interval, which adds the transfer error
+on both sides (level \eqn{1 - \alpha_1 - \alpha_2}). Defaults:
+"Weight construction error (95\%)" and "Prediction interval (90\%):
+weight construction + transfer error" (levels follow the fit).}
 
 \item{colours}{Optional named vector changing any of the colours
 \code{treated} ("black"), \code{synthetic} ("black"), \code{counterfactual} ("red"),

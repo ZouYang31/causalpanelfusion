@@ -44,7 +44,7 @@ test_that("legend entries cover every coloured element", {
   labs <- legend_labels(p)
   expect_true(all(c("treated", "Synthetic treated", "Counterfactual treated",
                     "Donor pool units") %in% labs))
-  expect_true(any(grepl("^In-sample interval", labs)))
+  expect_true(any(grepl("^Weight construction error", labs)))
   expect_true(any(grepl("^Prediction interval", labs)))
   pe <- plot(pi, type = "effect", counterfactual = sim$target0[1, ])
   expect_equal(legend_labels(pe)[1:2], c("Estimated effect", "True effect"))

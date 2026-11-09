@@ -26,7 +26,8 @@
 \item{method}{Band construction passed to \code{\link[=pi_bands]{pi_bands()}}.}
 
 \item{type}{\code{"counterfactual"} (default): the target-domain trajectories
-with the in-sample and total intervals on the synthetic control;
+with the weight-construction interval and the prediction interval
+(weight construction + transfer error) on the synthetic control;
 \code{"effect"}: per-period effects with their prediction intervals.}
 
 \item{counterfactual}{Optional true untreated outcomes of the treated

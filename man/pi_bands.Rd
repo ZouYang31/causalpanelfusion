@@ -33,8 +33,9 @@ per-period scale bound(s) replacing the plug-in scales.}
 }
 \value{
 A data frame with one row per target period: the observed and
-synthetic outcomes, the in-sample band (\code{insample_lo}, \code{insample_hi}),
-the total band for \eqn{Y_{1s}(0)} (\code{total_lo}, \code{total_hi}), the effect
+synthetic outcomes, the weight-construction band (\code{insample_lo},
+\code{insample_hi}), the prediction interval for \eqn{Y_{1s}(0)}, which adds
+the transfer error (\code{total_lo}, \code{total_hi}), the effect
 and its band (\code{effect_lo}, \code{effect_hi}) and the components \code{M1_L},
 \code{M1_U}, \code{M2_L}, \code{M2_U}, \code{sigma}.
 }

@@ -30,7 +30,12 @@
 #'   Legend labels. Defaults: the treated unit's name, "Synthetic <name>",
 #'   "Donor pool units" and "Counterfactual <name>".
 #' @param band_labels Optional labels for the two bands,
-#'   `c(insample = , total = )`.
+#'   `c(insample = , total = )`. The blue `insample` band covers the
+#'   weight-construction error only (level \eqn{1 - \alpha_1}); the red
+#'   `total` band is the prediction interval, which adds the transfer error
+#'   on both sides (level \eqn{1 - \alpha_1 - \alpha_2}). Defaults:
+#'   "Weight construction error (95%)" and "Prediction interval (90%):
+#'   weight construction + transfer error" (levels follow the fit).
 #' @param colours Optional named vector changing any of the colours
 #'   `treated` ("black"), `synthetic` ("black"), `counterfactual` ("red"),
 #'   `donor` ("grey60"), `insample` ("#1f4ee0") and `total` ("#E06666"),
@@ -123,10 +128,11 @@ plot.scfusion <- function(x, type = c("target", "reference", "gaps"),
     bd <- .as_bands(bands)
     if (is.null(band_labels)) {
       band_labels <- c(
-        insample = sprintf("In-sample interval (%s%%)",
+        insample = sprintf("Weight construction error (%s%%)",
                            format(100 * (1 - attr(bd, "alpha")[["alpha1"]]))),
-        total = sprintf("Prediction interval (%s%%)",
-                        format(100 * attr(bd, "level"))))
+        total = sprintf(
+          "Prediction interval (%s%%):\nweight construction + transfer error",
+          format(100 * attr(bd, "level"))))
     }
     if (length(band_labels) != 2L) {
       stop("`band_labels` must have two elements (insample, total).",
@@ -271,7 +277,8 @@ plot.scfusion <- function(x, type = c("target", "reference", "gaps"),
 #' @param x An `"scfusion_pi"` object.
 #' @param method Band construction passed to [pi_bands()].
 #' @param type `"counterfactual"` (default): the target-domain trajectories
-#'   with the in-sample and total intervals on the synthetic control;
+#'   with the weight-construction interval and the prediction interval
+#'   (weight construction + transfer error) on the synthetic control;
 #'   `"effect"`: per-period effects with their prediction intervals.
 #' @param counterfactual Optional true untreated outcomes of the treated
 #'   unit (simulations). With `type = "counterfactual"` it is drawn as a red

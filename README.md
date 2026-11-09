@@ -163,7 +163,7 @@ pi <- scfusion_pi(fit, alpha1 = 0.05, alpha2 = 0.05, B = 200,
                   budget_step = 0.05, seed = 1)
 pi
 #>                      method   approach level estimate   lower   upper   width
-#>              in-sample only diagnostic   95%   3.5099  2.3122  4.9424  2.6302
+#>    weight construction only diagnostic   95%   3.5099  2.3122  4.9424  2.6302
 #>   location-scale (Gaussian) Approach 2   90%   3.5099 -3.7708 11.0253 14.7961
 #>  location-scale (empirical) Approach 2   90%   3.5099 -1.2463 10.3690 11.6152
 #>          sub-Gaussian bound Approach 1   90%   3.5099 -6.1179 13.3724 19.4903
@@ -186,6 +186,10 @@ plot(pi, type = "effect")   # per-period effects with bands
 ```
 
 <img src="man/figures/README-target.png" width="640" />
+
+The blue bars cover the weight-construction error only. The red bars are the
+prediction intervals: the blue bar widened on each side by the transfer
+error, so they combine both sources at level `1 - alpha1 - alpha2`.
 
 The transfer error is not identified nonparametrically, so
 `sensitivity_pi()` shows how the interval grows as its scale is multiplied by

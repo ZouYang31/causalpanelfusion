@@ -317,7 +317,7 @@ scfusion_pi <- function(fit, alpha1 = 0.05, alpha2 = 0.05, B = 500L,
   )
   level <- 1 - alpha1 - alpha2
   intervals <- data.frame(
-    method = c("in-sample only", "location-scale (Gaussian)",
+    method = c("weight construction only", "location-scale (Gaussian)",
                "location-scale (empirical)", "sub-Gaussian bound"),
     approach = c("diagnostic", "Approach 2", "Approach 2", "Approach 1"),
     level = c(1 - alpha1, level, level, level),
@@ -405,8 +405,9 @@ print.scfusion_pi <- function(x, digits = 4, ...) {
 #'   per-period scale bound(s) replacing the plug-in scales.
 #'
 #' @return A data frame with one row per target period: the observed and
-#'   synthetic outcomes, the in-sample band (`insample_lo`, `insample_hi`),
-#'   the total band for \eqn{Y_{1s}(0)} (`total_lo`, `total_hi`), the effect
+#'   synthetic outcomes, the weight-construction band (`insample_lo`,
+#'   `insample_hi`), the prediction interval for \eqn{Y_{1s}(0)}, which adds
+#'   the transfer error (`total_lo`, `total_hi`), the effect
 #'   and its band (`effect_lo`, `effect_hi`) and the components `M1_L`,
 #'   `M1_U`, `M2_L`, `M2_U`, `sigma`.
 #' @examples
