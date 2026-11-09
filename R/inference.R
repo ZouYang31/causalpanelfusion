@@ -324,6 +324,7 @@ scfusion_pi <- function(fit, alpha1 = 0.05, alpha2 = 0.05, B = 500L,
     estimate = psi,
     lower = c(psi - M1[["U"]], psi - M1[["U"]] - M2[, 2] - gamma),
     upper = c(psi - M1[["L"]], psi - M1[["L"]] - M2[, 1] + gamma),
+    row.names = NULL,
     stringsAsFactors = FALSE
   )
   intervals$width <- intervals$upper - intervals$lower
