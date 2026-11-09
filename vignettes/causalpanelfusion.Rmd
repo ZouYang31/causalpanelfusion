@@ -68,6 +68,20 @@ plot(fit)                       # target domain
 plot(fit, type = "reference")   # reference domain (where weights are fit)
 ```
 
+Plots are ggplot objects with the legend inside the panel. Labels, axis
+titles, limits, colours and the legend position can all be changed, and in a
+simulation the true counterfactual can be added:
+
+```{r}
+plot(fit, counterfactual = sim$target0[1, ],
+     treated_label = "observed target unit",
+     synthetic_label = "synthetic control target unit",
+     counterfactual_label = "counterfactual target unit",
+     donor_label = "donor pool units",
+     xlab = "Period", ylab = "Outcome in the target domain",
+     legend_position = "topleft")
+```
+
 `covariate_balance()` gives the covariate balance table: the treated unit,
 its synthetic control and the donor pool for every covariate in both
 domains, the rank of the treated unit among all units, and (in the footer)

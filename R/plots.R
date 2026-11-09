@@ -1,8 +1,19 @@
+# Plot methods. All return ggplot objects; every coloured element has a
+# legend entry, the legend sits inside the panel by default
+# (`legend_position`), and axis labels can be changed with `xlab`/`ylab`.
+
+.col <- list(
+  treated = "black", synthetic = "black", donor = "grey60",
+  counterfactual = "red", insample = "#1f4ee0", total = "#E06666",
+  zero = "blue", sensitivity = "#7B2D26"
+)
+
 #' Plot a synthetic control data-fusion fit
 #'
-#' Draws the treated unit, its synthetic control and the donors in the target
-#' or reference domain, or the per-period gaps. Prediction bands from
-#' [scfusion_pi()] can be overlaid on the synthetic target trajectory.
+#' Draws the treated unit, its synthetic control and the donor pool in the
+#' target or reference domain, or the per-period gaps. Prediction bands from
+#' [scfusion_pi()] and, in simulations, the true counterfactual trajectory can
+#' be added; each gets its own legend entry.
 #'
 #' @param x An `"scfusion"` object.
 #' @param type `"target"` (default), `"reference"` or `"gaps"` (treated minus
@@ -11,33 +22,62 @@
 #'   `"scfusion_pi"` object (Gaussian bands are used) or a data frame from
 #'   [pi_bands()].
 #' @param band_style `"errorbar"` (default) or `"ribbon"`.
+#' @param counterfactual Optional numeric vector with the treated unit's true
+#'   untreated target-domain outcomes (known in simulations, e.g.
+#'   `sim$target0[1, ]`), drawn as a red line.
 #' @param show_donors Draw the donor trajectories in grey.
-#' @param treated_label,donor_label Legend labels.
+#' @param treated_label,synthetic_label,donor_label,counterfactual_label
+#'   Legend labels. Defaults: the treated unit's name, "Synthetic <name>",
+#'   "Donor pool units" and "Counterfactual <name>".
+#' @param band_labels Optional labels for the two bands,
+#'   `c(insample = , total = )`.
+#' @param colours Optional named vector changing any of the colours
+#'   `treated` ("black"), `synthetic` ("black"), `counterfactual` ("red"),
+#'   `donor` ("grey60"), `insample` ("#1f4ee0") and `total` ("#E06666"),
+#'   e.g. `colours = c(total = "orange")`.
 #' @param xlab,ylab Axis labels.
+#' @param ylim Optional y-axis limits (zooms without dropping data).
+#' @param legend_position Where to put the legend: inside the panel at
+#'   `"bottomright"` (default), `"bottomleft"`, `"topright"` or `"topleft"`;
+#'   a numeric `c(x, y)` in `[0, 1]` for any point inside the panel; or
+#'   outside with `"bottom"`, `"top"`, `"left"`, `"right"`; or `"none"`.
 #' @param ... Unused.
-#' @return A `ggplot` object.
+#' @return A `ggplot` object (add layers or themes with `+`).
 #' @examples
 #' sim <- simulate_fusion_data(n_units = 16, n_ref = 12, n_target = 4,
 #'                             seed = 1)
 #' fit <- scfusion(sim$target, sim$reference, X = sim$X, Z = sim$Z,
 #'                 budget_step = 0.1)
 #' plot(fit)
+#' plot(fit, counterfactual = sim$target0[1, ], treated_label = "target unit",
+#'      xlab = "Period", ylab = "Outcome", legend_position = "topleft")
 #' plot(fit, type = "reference")
 #' @export
 plot.scfusion <- function(x, type = c("target", "reference", "gaps"),
                           bands = NULL, band_style = c("errorbar", "ribbon"),
-                          show_donors = TRUE, treated_label = NULL,
-                          donor_label = "Donors", xlab = "Time",
-                          ylab = NULL, ...) {
+                          counterfactual = NULL, show_donors = TRUE,
+                          treated_label = NULL, synthetic_label = NULL,
+                          donor_label = "Donor pool units",
+                          counterfactual_label = NULL, band_labels = NULL,
+                          colours = NULL,
+                          xlab = "Time", ylab = NULL, ylim = NULL,
+                          legend_position = "bottomright", ...) {
   type <- match.arg(type)
   band_style <- match.arg(band_style)
+  col <- .resolve_colours(colours)
   tr_name <- x$data$unit_names[x$treated]
-  if (is.null(treated_label)) treated_label <- tr_name
-  syn_label <- paste("Synthetic", treated_label)
   if (type == "gaps") return(.plot_gaps(x, xlab, ylab))
 
+  if (is.null(treated_label)) treated_label <- tr_name
+  if (is.null(synthetic_label)) {
+    synthetic_label <- paste("Synthetic", treated_label)
+  }
+  if (is.null(counterfactual_label)) {
+    counterfactual_label <- paste("Counterfactual", treated_label)
+  }
   M <- if (type == "target") x$data$target else x$data$reference
   syn <- if (type == "target") x$synthetic_target else x$synthetic_reference
+  n_t <- ncol(M)
   if (is.null(ylab)) {
     ylab <- if (is.null(x$data$axis_labels)) {
       sprintf("Outcome (%s domain)", type)
@@ -45,56 +85,115 @@ plot.scfusion <- function(x, type = c("target", "reference", "gaps"),
       sprintf("%s (%s domain)", x$data$axis_labels[[type]], type)
     }
   }
-  n_t <- ncol(M)
-  donors <- data.frame(
-    time = rep(seq_len(n_t), each = length(x$donors)),
-    value = as.vector(M[x$donors, , drop = FALSE]),
-    unit = rep(x$data$unit_names[x$donors], n_t),
-    series = donor_label, stringsAsFactors = FALSE
-  )
-  main <- rbind(
-    data.frame(time = seq_len(n_t), value = as.numeric(M[x$treated, ]),
-               unit = tr_name, series = treated_label,
-               stringsAsFactors = FALSE),
-    data.frame(time = seq_len(n_t), value = as.numeric(syn),
-               unit = "synthetic", series = syn_label,
-               stringsAsFactors = FALSE)
-  )
-  lev <- c(treated_label, syn_label, donor_label)
-  colours <- stats::setNames(c("black", "black", "grey60"), lev)
-  ltys <- stats::setNames(c("solid", "dashed", "solid"), lev)
 
-  p <- ggplot2::ggplot()
+  lines <- list(
+    .series_df(seq_len(n_t), M[x$treated, ], treated_label),
+    .series_df(seq_len(n_t), syn, synthetic_label)
+  )
+  styles <- list(c(treated_label, col$treated, "solid"),
+                 c(synthetic_label, col$synthetic, "dashed"))
+  if (!is.null(counterfactual)) {
+    if (type != "target") {
+      warning("`counterfactual` is only drawn for type = \"target\".",
+              call. = FALSE)
+    } else {
+      counterfactual <- as.numeric(counterfactual)
+      if (length(counterfactual) != n_t || any(!is.finite(counterfactual))) {
+        stop(sprintf("`counterfactual` must have %d finite values.", n_t),
+             call. = FALSE)
+      }
+      lines[[3]] <- .series_df(seq_len(n_t), counterfactual,
+                               counterfactual_label)
+      styles[[3]] <- c(counterfactual_label, col$counterfactual, "solid")
+    }
+  }
+  donors <- NULL
+  if (show_donors) {
+    donors <- data.frame(
+      time = rep(seq_len(n_t), each = length(x$donors)),
+      value = as.vector(M[x$donors, , drop = FALSE]),
+      unit = rep(x$data$unit_names[x$donors], n_t),
+      series = donor_label, stringsAsFactors = FALSE
+    )
+    styles[[length(styles) + 1L]] <- c(donor_label, col$donor, "solid")
+  }
+
+  bd <- NULL
   if (!is.null(bands) && type == "target") {
     bd <- .as_bands(bands)
-    if (band_style == "ribbon") p <- p + .band_layers(bd, "ribbon")
+    if (is.null(band_labels)) {
+      band_labels <- c(
+        insample = sprintf("In-sample interval (%s%%)",
+                           format(100 * (1 - attr(bd, "alpha")[["alpha1"]]))),
+        total = sprintf("Prediction interval (%s%%)",
+                        format(100 * attr(bd, "level"))))
+    }
+    if (length(band_labels) != 2L) {
+      stop("`band_labels` must have two elements (insample, total).",
+           call. = FALSE)
+    }
+    if (is.null(names(band_labels))) {
+      names(band_labels) <- c("insample", "total")
+    }
+    if (band_style == "errorbar") {
+      styles[[length(styles) + 1L]] <- c(band_labels[["insample"]],
+                                         col$insample, "solid")
+      styles[[length(styles) + 1L]] <- c(band_labels[["total"]],
+                                         col$total, "solid")
+    }
   }
-  if (show_donors) {
+  sty <- .style_table(styles)
+
+  p <- ggplot2::ggplot()
+  if (!is.null(bd) && band_style == "ribbon") {
+    p <- p + .band_ribbons(bd, band_labels, col)
+  }
+  if (!is.null(donors)) {
     p <- p + ggplot2::geom_line(
       data = donors,
       ggplot2::aes(x = .data$time, y = .data$value, group = .data$unit,
                    colour = .data$series, linetype = .data$series),
-      linewidth = 0.6, alpha = 0.5)
+      linewidth = 0.8, alpha = 0.5)
+  }
+  # draw synthetic, counterfactual, then the treated unit on top
+  for (k in c(2L, if (length(lines) > 2L) 3L, 1L)) {
+    p <- p + ggplot2::geom_line(
+      data = lines[[k]],
+      ggplot2::aes(x = .data$time, y = .data$value, colour = .data$series,
+                   linetype = .data$series),
+      linewidth = 0.8)
+  }
+  if (!is.null(bd) && band_style == "errorbar") {
+    p <- p + .band_errorbars(bd, band_labels)
   }
   p <- p +
-    ggplot2::geom_line(
-      data = main,
-      ggplot2::aes(x = .data$time, y = .data$value, group = .data$series,
-                   colour = .data$series, linetype = .data$series),
-      linewidth = 0.9) +
-    ggplot2::scale_colour_manual(values = colours, breaks = lev, name = NULL) +
-    ggplot2::scale_linetype_manual(values = ltys, breaks = lev, name = NULL) +
+    ggplot2::scale_colour_manual(values = sty$colour, breaks = sty$label,
+                                 name = NULL) +
+    ggplot2::scale_linetype_manual(values = sty$linetype, breaks = sty$label,
+                                   name = NULL) +
     ggplot2::scale_x_continuous(breaks = .int_breaks(n_t)) +
     ggplot2::labs(x = xlab, y = ylab) +
-    .cpf_theme()
-  if (!is.null(bands) && type == "target") {
-    if (band_style == "errorbar") p <- p + .band_layers(bd, "errorbar")
-    p <- p + ggplot2::labs(caption = sprintf(
-      "Bands on the synthetic control: blue = weight-construction error (%s%%), red = total (%s%%, %s)",
-      format(100 * (1 - attr(bd, "alpha")[["alpha1"]])),
-      format(100 * attr(bd, "level")), attr(bd, "method")))
-  }
+    .cpf_theme(legend_position)
+  if (!is.null(ylim)) p <- p + ggplot2::coord_cartesian(ylim = ylim)
   p
+}
+
+.series_df <- function(time, value, label) {
+  data.frame(time = time, value = as.numeric(value), series = label,
+             stringsAsFactors = FALSE)
+}
+
+# Turn a list of c(label, colour, linetype) into named value vectors.
+.style_table <- function(styles) {
+  labels <- vapply(styles, `[[`, "", 1L)
+  if (anyDuplicated(labels)) {
+    stop(sprintf("Legend labels must be distinct; duplicated: %s.",
+                 paste(unique(labels[duplicated(labels)]), collapse = ", ")),
+         call. = FALSE)
+  }
+  list(label = labels,
+       colour = stats::setNames(vapply(styles, `[[`, "", 2L), labels),
+       linetype = stats::setNames(vapply(styles, `[[`, "", 3L), labels))
 }
 
 .as_bands <- function(bands) {
@@ -107,31 +206,44 @@ plot.scfusion <- function(x, type = c("target", "reference", "gaps"),
   bands
 }
 
-.band_layers <- function(bd, style, col_in = "#1f4ee0", col_out = "#E06666") {
-  if (style == "ribbon") {
-    list(
-      ggplot2::geom_ribbon(
-        data = bd, ggplot2::aes(x = .data$time, ymin = .data$total_lo,
-                                ymax = .data$total_hi),
-        inherit.aes = FALSE, fill = col_out, alpha = 0.18),
-      ggplot2::geom_ribbon(
-        data = bd, ggplot2::aes(x = .data$time, ymin = .data$insample_lo,
-                                ymax = .data$insample_hi),
-        inherit.aes = FALSE, fill = col_in, alpha = 0.22)
-    )
-  } else {
-    list(
-      ggplot2::geom_errorbar(
-        data = bd, ggplot2::aes(x = .data$time, ymin = .data$total_lo,
-                                ymax = .data$total_hi),
-        inherit.aes = FALSE, colour = col_out, width = 0.39,
-        linewidth = 0.7),
-      ggplot2::geom_errorbar(
-        data = bd, ggplot2::aes(x = .data$time, ymin = .data$insample_lo,
-                                ymax = .data$insample_hi),
-        inherit.aes = FALSE, colour = col_in, width = 0.3, linewidth = 0.8)
-    )
-  }
+.band_errorbars <- function(bd, labels) {
+  tot <- data.frame(time = bd$time, lo = bd$total_lo, hi = bd$total_hi,
+                    series = labels[["total"]], stringsAsFactors = FALSE)
+  ins <- data.frame(time = bd$time, lo = bd$insample_lo, hi = bd$insample_hi,
+                    series = labels[["insample"]], stringsAsFactors = FALSE)
+  list(
+    ggplot2::geom_errorbar(
+      data = tot, ggplot2::aes(x = .data$time, ymin = .data$lo,
+                               ymax = .data$hi, colour = .data$series,
+                               linetype = .data$series),
+      inherit.aes = FALSE, width = 0.39, linewidth = 0.7),
+    ggplot2::geom_errorbar(
+      data = ins, ggplot2::aes(x = .data$time, ymin = .data$lo,
+                               ymax = .data$hi, colour = .data$series,
+                               linetype = .data$series),
+      inherit.aes = FALSE, width = 0.3, linewidth = 0.8)
+  )
+}
+
+.band_ribbons <- function(bd, labels, col) {
+  df <- rbind(
+    data.frame(time = bd$time, lo = bd$total_lo, hi = bd$total_hi,
+               series = labels[["total"]], stringsAsFactors = FALSE),
+    data.frame(time = bd$time, lo = bd$insample_lo, hi = bd$insample_hi,
+               series = labels[["insample"]], stringsAsFactors = FALSE)
+  )
+  fills <- stats::setNames(c(col$total, col$insample),
+                           c(labels[["total"]], labels[["insample"]]))
+  list(
+    ggplot2::geom_ribbon(
+      data = df, ggplot2::aes(x = .data$time, ymin = .data$lo,
+                              ymax = .data$hi, fill = .data$series),
+      inherit.aes = FALSE, alpha = 0.25),
+    ggplot2::scale_fill_manual(values = fills,
+                               breaks = c(labels[["insample"]],
+                                          labels[["total"]]),
+                               name = NULL)
+  )
 }
 
 .plot_gaps <- function(x, xlab, ylab) {
@@ -145,13 +257,13 @@ plot.scfusion <- function(x, type = c("target", "reference", "gaps"),
   )
   ggplot2::ggplot(df, ggplot2::aes(x = .data$time, y = .data$gap)) +
     ggplot2::geom_hline(yintercept = 0, linetype = "dashed",
-                        colour = "steelblue") +
+                        colour = .col$zero, linewidth = 0.5) +
     ggplot2::geom_line(linewidth = 0.8) +
     ggplot2::geom_point(size = 1.2) +
     ggplot2::facet_wrap(~domain, scales = "free") +
     ggplot2::labs(x = xlab, y = if (is.null(ylab)) "Treated - synthetic" else
       ylab) +
-    .cpf_theme()
+    .cpf_theme("none")
 }
 
 #' Plot prediction intervals
@@ -159,173 +271,375 @@ plot.scfusion <- function(x, type = c("target", "reference", "gaps"),
 #' @param x An `"scfusion_pi"` object.
 #' @param method Band construction passed to [pi_bands()].
 #' @param type `"counterfactual"` (default): the target-domain trajectories
-#'   with bands on the synthetic control; `"effect"`: per-period effects with
-#'   their bands.
-#' @param ... Passed to [plot.scfusion()] for `type = "counterfactual"`.
+#'   with the in-sample and total intervals on the synthetic control;
+#'   `"effect"`: per-period effects with their prediction intervals.
+#' @param counterfactual Optional true untreated outcomes of the treated
+#'   unit (simulations). With `type = "counterfactual"` it is drawn as a red
+#'   line; with `type = "effect"` the true effects are shown as red
+#'   triangles.
+#' @param effect_label,true_label,band_label Legend labels for
+#'   `type = "effect"`.
+#' @param colours Optional named vector of colours, as in [plot.scfusion()]
+#'   (`type = "effect"` uses `treated` for the estimates, `counterfactual`
+#'   for the true effects and `total` for the intervals).
+#' @param xlab,ylab,ylim,legend_position As in [plot.scfusion()].
+#' @param ... Further arguments passed to [plot.scfusion()] for
+#'   `type = "counterfactual"` (e.g. `treated_label`, `donor_label`,
+#'   `band_labels`, `band_style`).
 #' @return A `ggplot` object.
 #' @export
 plot.scfusion_pi <- function(x, method = c("gaussian", "empirical",
                                            "subgaussian"),
-                             type = c("counterfactual", "effect"), ...) {
+                             type = c("counterfactual", "effect"),
+                             counterfactual = NULL,
+                             effect_label = "Estimated effect",
+                             true_label = "True effect", band_label = NULL,
+                             colours = NULL,
+                             xlab = "Time", ylab = NULL, ylim = NULL,
+                             legend_position = "bottomright", ...) {
   method <- match.arg(method)
   type <- match.arg(type)
   bd <- pi_bands(x, method = method)
-  if (type == "counterfactual") return(plot.scfusion(x$fit, bands = bd, ...))
-  ggplot2::ggplot(bd, ggplot2::aes(x = .data$time, y = .data$effect)) +
+  if (type == "counterfactual") {
+    return(plot.scfusion(x$fit, bands = bd, counterfactual = counterfactual,
+                         colours = colours, xlab = xlab, ylab = ylab,
+                         ylim = ylim, legend_position = legend_position, ...))
+  }
+  if (is.null(band_label)) {
+    band_label <- sprintf("Prediction interval (%s%%)",
+                          format(100 * attr(bd, "level")))
+  }
+  col <- .resolve_colours(colours)
+  styles <- list(c(effect_label, col$treated, "blank"))
+  shapes <- 16
+  est <- .series_df(bd$time, bd$effect, effect_label)
+  truth <- NULL
+  if (!is.null(counterfactual)) {
+    counterfactual <- as.numeric(counterfactual)
+    if (length(counterfactual) != nrow(bd)) {
+      stop(sprintf("`counterfactual` must have %d values.", nrow(bd)),
+           call. = FALSE)
+    }
+    truth <- .series_df(bd$time, bd$treated - counterfactual, true_label)
+    styles[[2]] <- c(true_label, col$counterfactual, "blank")
+    shapes <- c(shapes, 17)
+  }
+  styles[[length(styles) + 1L]] <- c(band_label, col$total, "solid")
+  shapes <- c(shapes, NA)
+  sty <- .style_table(styles)
+  bars <- data.frame(time = bd$time, lo = bd$effect_lo, hi = bd$effect_hi,
+                     series = band_label, stringsAsFactors = FALSE)
+
+  p <- ggplot2::ggplot() +
     ggplot2::geom_hline(yintercept = 0, linetype = "dashed",
                         colour = "grey40") +
-    ggplot2::geom_errorbar(ggplot2::aes(ymin = .data$effect_lo,
-                                        ymax = .data$effect_hi),
-                           colour = "#E06666", width = 0.3, linewidth = 0.7) +
-    ggplot2::geom_point(size = 2) +
+    ggplot2::geom_errorbar(
+      data = bars, ggplot2::aes(x = .data$time, ymin = .data$lo,
+                                ymax = .data$hi, colour = .data$series),
+      width = 0.3, linewidth = 0.7) +
+    ggplot2::geom_point(
+      data = est, ggplot2::aes(x = .data$time, y = .data$value,
+                               colour = .data$series), size = 2.2)
+  if (!is.null(truth)) {
+    p <- p + ggplot2::geom_point(
+      data = truth, ggplot2::aes(x = .data$time, y = .data$value,
+                                 colour = .data$series),
+      shape = 17, size = 2.4)
+  }
+  p <- p +
+    ggplot2::scale_colour_manual(values = sty$colour, breaks = sty$label,
+                                 name = NULL) +
+    ggplot2::guides(colour = ggplot2::guide_legend(
+      override.aes = list(shape = shapes, linetype = unname(sty$linetype)))) +
     ggplot2::scale_x_continuous(breaks = .int_breaks(nrow(bd))) +
-    ggplot2::labs(x = "Time", y = "Effect on the treated unit",
-                  caption = sprintf("Pointwise %s%% prediction bands (%s)",
-                                    format(100 * attr(bd, "level")),
-                                    method)) +
-    .cpf_theme()
+    ggplot2::labs(x = xlab,
+                  y = if (is.null(ylab)) "Effect on the treated unit" else
+                    ylab) +
+    .cpf_theme(legend_position)
+  if (!is.null(ylim)) p <- p + ggplot2::coord_cartesian(ylim = ylim)
+  p
 }
 
 #' Plot placebo-test gaps
 #'
+#' For in-space placebos, the treated unit's gap (black) is drawn against
+#' the placebo units' gaps (grey). For the leave-one-out test, the gap of the
+#' original synthetic control (thick black) is drawn against the gaps
+#' obtained when each positive-weight donor is left out in turn (grey).
+#'
 #' @param x An `"scfusion_placebo"` object.
 #' @param domain `"target"` (default) or `"reference"`.
-#' @param ylim Optional y-axis limits.
+#' @param treated_label,placebo_label Legend labels. Defaults: the treated
+#'   unit's name and "Placebo units" (in-space), or "Original synthetic
+#'   <name>" and "Leave-one-out synthetic <name>" (leave-one-out).
+#' @param xlab,ylab,ylim,legend_position As in [plot.scfusion()].
 #' @param ... Unused.
 #' @return A `ggplot` object.
 #' @export
 plot.scfusion_placebo <- function(x, domain = c("target", "reference"),
-                                  ylim = NULL, ...) {
+                                  treated_label = NULL, placebo_label = NULL,
+                                  xlab = "Time", ylab = NULL, ylim = NULL,
+                                  legend_position = "bottomright", ...) {
   domain <- match.arg(domain)
-  df <- x$gaps[x$gaps$domain == domain, , drop = FALSE]
-  if (x$type == "in_space") {
-    lev <- c(x$treated, "Placebo units")
-  } else {
-    lev <- c("All donors", "One donor left out")
+  loo <- x$type == "leave_one_out"
+  if (is.null(treated_label)) {
+    treated_label <- if (loo) paste("Original synthetic", x$treated) else
+      x$treated
   }
-  df$series <- ifelse(df$role == "treated", lev[1], lev[2])
+  if (is.null(placebo_label)) {
+    placebo_label <- if (loo) paste("Leave-one-out synthetic", x$treated) else
+      "Placebo units"
+  }
+  if (is.null(ylab)) {
+    ylab <- if (domain == "target") "Effect (target domain)" else
+      "Gap (reference domain)"
+  }
+  df <- x$gaps[x$gaps$domain == domain, , drop = FALSE]
+  df$series <- ifelse(df$role == "treated", treated_label, placebo_label)
+  sty <- .style_table(list(c(treated_label, .col$treated, "solid"),
+                           c(placebo_label, .col$donor, "solid")))
   p <- ggplot2::ggplot() +
     ggplot2::geom_hline(yintercept = 0, linetype = "dashed",
-                        colour = "steelblue") +
+                        colour = .col$zero, linewidth = 0.5) +
     ggplot2::geom_line(
       data = df[df$role != "treated", ],
       ggplot2::aes(x = .data$time, y = .data$gap, group = .data$unit,
-                   colour = .data$series), linewidth = 0.6, alpha = 0.6) +
+                   colour = .data$series, linetype = .data$series),
+      linewidth = 0.8, alpha = 0.6) +
     ggplot2::geom_line(
       data = df[df$role == "treated", ],
       ggplot2::aes(x = .data$time, y = .data$gap, group = .data$unit,
-                   colour = .data$series), linewidth = 1) +
-    ggplot2::scale_colour_manual(values = stats::setNames(c("black",
-                                                            "grey60"), lev),
-                                 breaks = lev, name = NULL) +
+                   colour = .data$series, linetype = .data$series),
+      linewidth = if (loo) 1.2 else 0.8) +
+    ggplot2::scale_colour_manual(values = sty$colour, breaks = sty$label,
+                                 name = NULL) +
+    ggplot2::scale_linetype_manual(values = sty$linetype, breaks = sty$label,
+                                   name = NULL) +
     ggplot2::scale_x_continuous(breaks = .int_breaks(max(df$time))) +
-    ggplot2::labs(x = "Time", y = sprintf("Gap (%s domain)", domain)) +
-    .cpf_theme()
+    ggplot2::labs(x = xlab, y = ylab) +
+    .cpf_theme(legend_position)
   if (!is.null(ylim)) p <- p + ggplot2::coord_cartesian(ylim = ylim)
   p
 }
 
 #' Plot the RMSPE ratios
 #' @param x An `"scfusion_rmspe"` object.
+#' @param treated_label,placebo_label Legend labels.
+#' @param xlab,ylab,legend_position As in [plot.scfusion()]; the legend
+#'   defaults to the top right, where the bars (sorted from largest) leave
+#'   room.
 #' @param ... Unused.
 #' @return A `ggplot` object.
 #' @export
-plot.scfusion_rmspe <- function(x, ...) {
+plot.scfusion_rmspe <- function(x, treated_label = NULL,
+                                placebo_label = "Placebo units", xlab = NULL,
+                                ylab = "RMSPE ratio (target / reference)",
+                                legend_position = "topright", ...) {
+  if (is.null(treated_label)) treated_label <- x$treated
   tab <- x$table
   tab$unit <- factor(tab$unit, levels = tab$unit)
+  tab$series <- ifelse(tab$role == "treated", treated_label, placebo_label)
+  fills <- stats::setNames(c("black", "grey70"),
+                           c(treated_label, placebo_label))
   ggplot2::ggplot(tab, ggplot2::aes(x = .data$unit, y = .data$ratio,
-                                    fill = .data$role)) +
+                                    fill = .data$series)) +
     ggplot2::geom_col() +
-    ggplot2::scale_fill_manual(values = c(treated = "black",
-                                          placebo = "grey70"), name = NULL) +
-    ggplot2::labs(x = NULL, y = "RMSPE ratio (target / reference)",
+    ggplot2::scale_fill_manual(values = fills, breaks = names(fills),
+                               name = NULL) +
+    ggplot2::labs(x = xlab, y = ylab,
                   caption = sprintf("Exact placebo p-value = %d/%d = %s",
                                     x$rank, x$n_units, .fmt(x$p_value, 3))) +
-    .cpf_theme() +
+    .cpf_theme(legend_position) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 60,
-                                                       hjust = 1))
+                                                       hjust = 1, size = 11))
 }
 
 #' Heat map of the eta sensitivity analysis
 #' @param x An `"scfusion_eta"` object.
 #' @param value Column to display (default `"estimate"`).
+#' @param xlab,ylab Axis labels.
+#' @param legend_position As in [plot.scfusion()]; defaults to `"right"`
+#'   (outside), since an inside legend would cover tiles.
 #' @param ... Unused.
 #' @return A `ggplot` object.
 #' @export
-plot.scfusion_eta <- function(x, value = "estimate", ...) {
+plot.scfusion_eta <- function(x, value = "estimate",
+                              xlab = expression(eta[X]),
+                              ylab = expression(eta[Z]),
+                              legend_position = "right", ...) {
   if (!value %in% names(x)) {
     stop(sprintf("Column '%s' not found.", value), call. = FALSE)
   }
   df <- data.frame(eta_X = factor(x$eta_X), eta_Z = factor(x$eta_Z),
                    value = x[[value]])
-  ggplot2::ggplot(df, ggplot2::aes(x = .data$eta_X, y = .data$eta_Z,
-                                   fill = .data$value)) +
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = .data$eta_X, y = .data$eta_Z,
+                                        fill = .data$value)) +
     ggplot2::geom_tile(colour = "white") +
     ggplot2::geom_text(ggplot2::aes(label = signif(.data$value, 3)),
-                       size = 4) +
+                       size = 4.5) +
     ggplot2::scale_fill_gradient(low = "#EAF2FB", high = "#6BAED6",
                                  name = value) +
-    ggplot2::labs(x = expression(eta[X]), y = expression(eta[Z])) +
-    .cpf_theme() +
-    ggplot2::theme(legend.position = "right")
+    ggplot2::labs(x = xlab, y = ylab) +
+    .cpf_theme(legend_position)
+  # the colour bar keeps its title (the displayed quantity)
+  p + ggplot2::theme(legend.title = ggplot2::element_text(size = 13))
 }
 
 #' Plot the transfer-scale sensitivity analysis
 #' @param x An `"scfusion_sensitivity"` object.
+#' @param estimate_label,interval_label Legend labels.
+#' @param colour Colour of the intervals.
+#' @param xlab,ylab,legend_position As in [plot.scfusion()].
 #' @param ... Unused.
 #' @return A `ggplot` object.
 #' @export
-plot.scfusion_sensitivity <- function(x, ...) {
+plot.scfusion_sensitivity <- function(x, estimate_label = "Estimate",
+                                      interval_label = NULL,
+                                      colour = "#7B2D26",
+                                      xlab = expression(rho ~
+                                        "(multiplier of the transfer scale)"),
+                                      ylab = NULL,
+                                      legend_position = "topleft", ...) {
   per <- attr(x, "period")
-  ggplot2::ggplot(x, ggplot2::aes(x = .data$rho)) +
+  if (is.null(interval_label)) {
+    interval_label <- sprintf("Prediction interval (%s%%, %s)",
+                              format(100 * attr(x, "level")),
+                              attr(x, "method"))
+  }
+  if (is.null(ylab)) {
+    ylab <- if (is.null(per)) "Average effect" else
+      sprintf("Effect in target period %d", per)
+  }
+  sty <- .style_table(list(c(estimate_label, "black", "blank"),
+                           c(interval_label, colour, "solid")))
+  df <- as.data.frame(unclass(x))
+  est <- .series_df(df$rho, df$estimate, estimate_label)
+  bars <- data.frame(rho = df$rho, lo = df$lower, hi = df$upper,
+                     series = interval_label, stringsAsFactors = FALSE)
+  ggplot2::ggplot() +
     ggplot2::geom_hline(yintercept = 0, linetype = "dotted") +
-    ggplot2::geom_errorbar(ggplot2::aes(ymin = .data$lower,
-                                        ymax = .data$upper),
-                           width = 0.1, colour = "#7B2D26",
-                           linewidth = 0.6) +
-    ggplot2::geom_point(ggplot2::aes(y = .data$estimate), size = 1.8) +
-    ggplot2::scale_x_continuous(breaks = x$rho) +
-    ggplot2::labs(
-      x = expression(rho ~ "(multiplier of the transfer scale)"),
-      y = if (is.null(per)) "Average effect" else
-        sprintf("Effect in target period %d", per),
-      caption = sprintf(
-        "%s%% intervals (%s). rho = 0: weight-construction error only; rho = 1: estimated scale.",
-        format(100 * attr(x, "level")), attr(x, "method"))) +
-    .cpf_theme()
+    ggplot2::geom_errorbar(
+      data = bars, ggplot2::aes(x = .data$rho, ymin = .data$lo,
+                                ymax = .data$hi, colour = .data$series),
+      width = 0.1, linewidth = 0.7) +
+    ggplot2::geom_point(
+      data = est, ggplot2::aes(x = .data$time, y = .data$value,
+                               colour = .data$series), size = 2) +
+    ggplot2::scale_colour_manual(values = sty$colour, breaks = sty$label,
+                                 name = NULL) +
+    ggplot2::guides(colour = ggplot2::guide_legend(
+      override.aes = list(shape = c(16, NA),
+                          linetype = c("blank", "solid")))) +
+    ggplot2::scale_x_continuous(breaks = df$rho) +
+    ggplot2::labs(x = xlab, y = ylab) +
+    .cpf_theme(legend_position)
 }
 
 #' Plot the equi-confounding diagram
 #' @param x An `"equi_confounding"` object.
+#' @param treated_label,donor_label Legend labels.
+#' @param xlab,ylab,legend_position As in [plot.scfusion()].
 #' @param ... Unused.
 #' @return A `ggplot` object.
 #' @export
-plot.equi_confounding <- function(x, ...) {
+plot.equi_confounding <- function(x, treated_label = "Treated",
+                                  donor_label = "Donors", xlab = NULL,
+                                  ylab = "Average outcome",
+                                  legend_position = "bottomright", ...) {
   m <- x$means
   df <- data.frame(
     domain = c(0, 1, 0, 1),
     value = c(m[["F0"]], m[["Y0"]], m[["F1"]], m[["Y1"]]),
-    group = c("Donors", "Donors", "Treated", "Treated"),
-    label = c("bar(F)[0]", "bar(Y)[0]", "bar(F)[1]", "bar(Y)[1]")
+    series = c(donor_label, donor_label, treated_label, treated_label),
+    label = c("bar(F)[0]", "bar(Y)[0]", "bar(F)[1]", "bar(Y)[1]"),
+    stringsAsFactors = FALSE
   )
+  sty <- .style_table(list(c(treated_label, "black", "dashed"),
+                           c(donor_label, "black", "solid")))
   ggplot2::ggplot(df, ggplot2::aes(x = .data$domain, y = .data$value,
-                                   group = .data$group,
-                                   linetype = .data$group)) +
+                                   group = .data$series,
+                                   linetype = .data$series)) +
     ggplot2::geom_line(linewidth = 0.8) +
     ggplot2::geom_point(size = 2) +
     ggplot2::geom_text(ggplot2::aes(label = .data$label), parse = TRUE,
-                       vjust = -0.6) +
+                       vjust = -0.6, size = 5) +
+    ggplot2::scale_linetype_manual(values = sty$linetype, breaks = sty$label,
+                                   name = NULL) +
     ggplot2::scale_x_continuous(breaks = c(0, 1),
                                 labels = c("Reference", "Target"),
                                 expand = ggplot2::expansion(add = 0.2)) +
-    ggplot2::labs(x = NULL, y = "Average outcome", linetype = NULL) +
-    .cpf_theme()
+    ggplot2::labs(x = xlab, y = ylab) +
+    .cpf_theme(legend_position)
 }
 
-.cpf_theme <- function() {
-  ggplot2::theme_minimal(base_size = 12) +
-    ggplot2::theme(legend.position = "bottom",
-                   panel.grid.minor = ggplot2::element_blank())
+# Default colours, optionally overridden by a named vector/list.
+.resolve_colours <- function(colours) {
+  col <- .col
+  if (is.null(colours)) return(col)
+  colours <- as.list(colours)
+  bad <- setdiff(names(colours), c("treated", "synthetic", "counterfactual",
+                                   "donor", "insample", "total"))
+  if (is.null(names(colours)) || any(names(colours) == "") || length(bad)) {
+    stop("`colours` must be named with any of: treated, synthetic, ",
+         "counterfactual, donor, insample, total.", call. = FALSE)
+  }
+  col[names(colours)] <- lapply(colours, as.character)
+  col
+}
+
+# ---- theme -----------------------------------------------------------------
+
+.cpf_theme <- function(legend_position = "bottomright") {
+  ggplot2::theme_minimal() +
+    ggplot2::theme(
+      text = ggplot2::element_text(family = "sans"),
+      axis.title = ggplot2::element_text(size = 18),
+      axis.text = ggplot2::element_text(size = 14),
+      strip.text = ggplot2::element_text(size = 14),
+      legend.text = ggplot2::element_text(size = 13),
+      legend.title = ggplot2::element_blank(),
+      legend.key.size = ggplot2::unit(1, "lines"),
+      legend.key.width = ggplot2::unit(2, "lines"),
+      panel.grid.minor = ggplot2::element_blank()
+    ) +
+    .legend_theme(legend_position)
+}
+
+# Legend inside the panel (corner keyword or c(x, y)) or outside.
+.legend_theme <- function(position) {
+  corners <- list(bottomright = c(0.98, 0.02), bottomleft = c(0.02, 0.02),
+                  topright = c(0.98, 0.98), topleft = c(0.02, 0.98))
+  outside <- c("none", "bottom", "top", "left", "right")
+  if (is.character(position) && length(position) == 1L) {
+    if (position %in% outside) {
+      return(ggplot2::theme(legend.position = position))
+    }
+    if (!position %in% names(corners)) {
+      stop("`legend_position` must be one of \"bottomright\", ",
+           "\"bottomleft\", \"topright\", \"topleft\", \"bottom\", \"top\", ",
+           "\"left\", \"right\", \"none\", or a numeric c(x, y) in [0, 1].",
+           call. = FALSE)
+    }
+    pos <- corners[[position]]
+  } else if (is.numeric(position) && length(position) == 2L &&
+             all(is.finite(position)) && all(position >= 0 & position <= 1)) {
+    pos <- as.numeric(position)
+  } else {
+    stop("`legend_position` must be a position keyword or a numeric c(x, y) ",
+         "in [0, 1].", call. = FALSE)
+  }
+  inside <- ggplot2::theme(
+    legend.background = ggplot2::element_rect(
+      fill = ggplot2::alpha("grey", 0.5), colour = NA),
+    legend.margin = ggplot2::margin(3, 6, 3, 6),
+    legend.justification = pos
+  )
+  if (utils::packageVersion("ggplot2") >= "3.5.0") {
+    inside + ggplot2::theme(legend.position = "inside",
+                            legend.position.inside = pos)
+  } else {
+    inside + ggplot2::theme(legend.position = pos)
+  }
 }
 
 .int_breaks <- function(n) {

@@ -4,12 +4,24 @@
 \alias{plot.scfusion_eta}
 \title{Heat map of the eta sensitivity analysis}
 \usage{
-\method{plot}{scfusion_eta}(x, value = "estimate", ...)
+\method{plot}{scfusion_eta}(
+  x,
+  value = "estimate",
+  xlab = expression(eta[X]),
+  ylab = expression(eta[Z]),
+  legend_position = "right",
+  ...
+)
 }
 \arguments{
 \item{x}{An \code{"scfusion_eta"} object.}
 
 \item{value}{Column to display (default \code{"estimate"}).}
+
+\item{xlab, ylab}{Axis labels.}
+
+\item{legend_position}{As in \code{\link[=plot.scfusion]{plot.scfusion()}}; defaults to \code{"right"}
+(outside), since an inside legend would cover tiles.}
 
 \item{...}{Unused.}
 }

@@ -9,11 +9,18 @@
   type = c("target", "reference", "gaps"),
   bands = NULL,
   band_style = c("errorbar", "ribbon"),
+  counterfactual = NULL,
   show_donors = TRUE,
   treated_label = NULL,
-  donor_label = "Donors",
+  synthetic_label = NULL,
+  donor_label = "Donor pool units",
+  counterfactual_label = NULL,
+  band_labels = NULL,
+  colours = NULL,
   xlab = "Time",
   ylab = NULL,
+  ylim = NULL,
+  legend_position = "bottomright",
   ...
 )
 }
@@ -29,21 +36,42 @@ synthetic in both domains).}
 
 \item{band_style}{\code{"errorbar"} (default) or \code{"ribbon"}.}
 
+\item{counterfactual}{Optional numeric vector with the treated unit's true
+untreated target-domain outcomes (known in simulations, e.g.
+\code{sim$target0[1, ]}), drawn as a red line.}
+
 \item{show_donors}{Draw the donor trajectories in grey.}
 
-\item{treated_label, donor_label}{Legend labels.}
+\item{treated_label, synthetic_label, donor_label, counterfactual_label}{Legend labels. Defaults: the treated unit's name, "Synthetic \if{html}{\out{<name>}}",
+"Donor pool units" and "Counterfactual \if{html}{\out{<name>}}".}
+
+\item{band_labels}{Optional labels for the two bands,
+\code{c(insample = , total = )}.}
+
+\item{colours}{Optional named vector changing any of the colours
+\code{treated} ("black"), \code{synthetic} ("black"), \code{counterfactual} ("red"),
+\code{donor} ("grey60"), \code{insample} ("#1f4ee0") and \code{total} ("#E06666"),
+e.g. \code{colours = c(total = "orange")}.}
 
 \item{xlab, ylab}{Axis labels.}
+
+\item{ylim}{Optional y-axis limits (zooms without dropping data).}
+
+\item{legend_position}{Where to put the legend: inside the panel at
+\code{"bottomright"} (default), \code{"bottomleft"}, \code{"topright"} or \code{"topleft"};
+a numeric \code{c(x, y)} in \verb{[0, 1]} for any point inside the panel; or
+outside with \code{"bottom"}, \code{"top"}, \code{"left"}, \code{"right"}; or \code{"none"}.}
 
 \item{...}{Unused.}
 }
 \value{
-A \code{ggplot} object.
+A \code{ggplot} object (add layers or themes with \code{+}).
 }
 \description{
-Draws the treated unit, its synthetic control and the donors in the target
-or reference domain, or the per-period gaps. Prediction bands from
-\code{\link[=scfusion_pi]{scfusion_pi()}} can be overlaid on the synthetic target trajectory.
+Draws the treated unit, its synthetic control and the donor pool in the
+target or reference domain, or the per-period gaps. Prediction bands from
+\code{\link[=scfusion_pi]{scfusion_pi()}} and, in simulations, the true counterfactual trajectory can
+be added; each gets its own legend entry.
 }
 \examples{
 sim <- simulate_fusion_data(n_units = 16, n_ref = 12, n_target = 4,
@@ -51,5 +79,7 @@ sim <- simulate_fusion_data(n_units = 16, n_ref = 12, n_target = 4,
 fit <- scfusion(sim$target, sim$reference, X = sim$X, Z = sim$Z,
                 budget_step = 0.1)
 plot(fit)
+plot(fit, counterfactual = sim$target0[1, ], treated_label = "target unit",
+     xlab = "Period", ylab = "Outcome", legend_position = "topleft")
 plot(fit, type = "reference")
 }

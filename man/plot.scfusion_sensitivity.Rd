@@ -4,10 +4,25 @@
 \alias{plot.scfusion_sensitivity}
 \title{Plot the transfer-scale sensitivity analysis}
 \usage{
-\method{plot}{scfusion_sensitivity}(x, ...)
+\method{plot}{scfusion_sensitivity}(
+  x,
+  estimate_label = "Estimate",
+  interval_label = NULL,
+  colour = "#7B2D26",
+  xlab = expression(rho ~ "(multiplier of the transfer scale)"),
+  ylab = NULL,
+  legend_position = "topleft",
+  ...
+)
 }
 \arguments{
 \item{x}{An \code{"scfusion_sensitivity"} object.}
+
+\item{estimate_label, interval_label}{Legend labels.}
+
+\item{colour}{Colour of the intervals.}
+
+\item{xlab, ylab, legend_position}{As in \code{\link[=plot.scfusion]{plot.scfusion()}}.}
 
 \item{...}{Unused.}
 }

@@ -4,10 +4,24 @@
 \alias{plot.scfusion_rmspe}
 \title{Plot the RMSPE ratios}
 \usage{
-\method{plot}{scfusion_rmspe}(x, ...)
+\method{plot}{scfusion_rmspe}(
+  x,
+  treated_label = NULL,
+  placebo_label = "Placebo units",
+  xlab = NULL,
+  ylab = "RMSPE ratio (target / reference)",
+  legend_position = "topright",
+  ...
+)
 }
 \arguments{
 \item{x}{An \code{"scfusion_rmspe"} object.}
+
+\item{treated_label, placebo_label}{Legend labels.}
+
+\item{xlab, ylab, legend_position}{As in \code{\link[=plot.scfusion]{plot.scfusion()}}; the legend
+defaults to the top right, where the bars (sorted from largest) leave
+room.}
 
 \item{...}{Unused.}
 }

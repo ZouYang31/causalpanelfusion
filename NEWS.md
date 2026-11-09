@@ -47,7 +47,13 @@ methods of the paper.
 * Bootstrap and placebo refits can run in parallel through future.apply
   (`parallel = TRUE`); results do not depend on the backend.
 * Plot functions return ggplot objects instead of printing and saving files,
-  and no longer depend on global variables.
+  and no longer depend on global variables. Legends sit inside the panel by
+  default (`legend_position`), every coloured element (counterfactual line,
+  interval bands) has a legend entry, and axis labels (`xlab`, `ylab`),
+  limits (`ylim`), legend labels and colours (`colours`) can be changed.
+  `plot.scfusion()` and `plot.scfusion_pi()` can add the true counterfactual
+  in simulations, and the leave-one-out plot follows the research figures
+  (original synthetic control in bold against the leave-one-out versions).
 
 ## Correspondence with the research code
 

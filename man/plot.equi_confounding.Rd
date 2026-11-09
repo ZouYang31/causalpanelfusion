@@ -4,10 +4,22 @@
 \alias{plot.equi_confounding}
 \title{Plot the equi-confounding diagram}
 \usage{
-\method{plot}{equi_confounding}(x, ...)
+\method{plot}{equi_confounding}(
+  x,
+  treated_label = "Treated",
+  donor_label = "Donors",
+  xlab = NULL,
+  ylab = "Average outcome",
+  legend_position = "bottomright",
+  ...
+)
 }
 \arguments{
 \item{x}{An \code{"equi_confounding"} object.}
+
+\item{treated_label, donor_label}{Legend labels.}
+
+\item{xlab, ylab, legend_position}{As in \code{\link[=plot.scfusion]{plot.scfusion()}}.}
 
 \item{...}{Unused.}
 }

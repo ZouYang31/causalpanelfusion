@@ -8,6 +8,15 @@
   x,
   method = c("gaussian", "empirical", "subgaussian"),
   type = c("counterfactual", "effect"),
+  counterfactual = NULL,
+  effect_label = "Estimated effect",
+  true_label = "True effect",
+  band_label = NULL,
+  colours = NULL,
+  xlab = "Time",
+  ylab = NULL,
+  ylim = NULL,
+  legend_position = "bottomright",
   ...
 )
 }
@@ -17,10 +26,26 @@
 \item{method}{Band construction passed to \code{\link[=pi_bands]{pi_bands()}}.}
 
 \item{type}{\code{"counterfactual"} (default): the target-domain trajectories
-with bands on the synthetic control; \code{"effect"}: per-period effects with
-their bands.}
+with the in-sample and total intervals on the synthetic control;
+\code{"effect"}: per-period effects with their prediction intervals.}
 
-\item{...}{Passed to \code{\link[=plot.scfusion]{plot.scfusion()}} for \code{type = "counterfactual"}.}
+\item{counterfactual}{Optional true untreated outcomes of the treated
+unit (simulations). With \code{type = "counterfactual"} it is drawn as a red
+line; with \code{type = "effect"} the true effects are shown as red
+triangles.}
+
+\item{effect_label, true_label, band_label}{Legend labels for
+\code{type = "effect"}.}
+
+\item{colours}{Optional named vector of colours, as in \code{\link[=plot.scfusion]{plot.scfusion()}}
+(\code{type = "effect"} uses \code{treated} for the estimates, \code{counterfactual}
+for the true effects and \code{total} for the intervals).}
+
+\item{xlab, ylab, ylim, legend_position}{As in \code{\link[=plot.scfusion]{plot.scfusion()}}.}
+
+\item{...}{Further arguments passed to \code{\link[=plot.scfusion]{plot.scfusion()}} for
+\code{type = "counterfactual"} (e.g. \code{treated_label}, \code{donor_label},
+\code{band_labels}, \code{band_style}).}
 }
 \value{
 A \code{ggplot} object.

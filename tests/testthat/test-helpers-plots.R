@@ -30,3 +30,59 @@ test_that("plot methods return ggplot objects", {
   expect_s3_class(plot(pi, type = "effect", method = "empirical"), "ggplot")
   expect_s3_class(plot(fit, bands = pi, band_style = "ribbon"), "ggplot")
 })
+
+legend_labels <- function(p, aes = "colour") {
+  b <- ggplot2::ggplot_build(p)
+  b$plot$scales$get_scales(aes)$get_labels()
+}
+
+test_that("legend entries cover every coloured element", {
+  sim <- small_sim()
+  fit <- small_fit(sim)
+  pi <- scfusion_pi(fit, B = 6, seed = 1, progress = FALSE)
+  p <- plot(pi, counterfactual = sim$target0[1, ])
+  labs <- legend_labels(p)
+  expect_true(all(c("treated", "Synthetic treated", "Counterfactual treated",
+                    "Donor pool units") %in% labs))
+  expect_true(any(grepl("^In-sample interval", labs)))
+  expect_true(any(grepl("^Prediction interval", labs)))
+  pe <- plot(pi, type = "effect", counterfactual = sim$target0[1, ])
+  expect_equal(legend_labels(pe)[1:2], c("Estimated effect", "True effect"))
+  expect_true("Placebo units" %in% legend_labels(
+    plot(placebo_test(fit, progress = FALSE))))
+  loo <- placebo_test(fit, type = "leave_one_out", progress = FALSE)
+  expect_equal(legend_labels(plot(loo)),
+               c("Original synthetic treated",
+                 "Leave-one-out synthetic treated"))
+})
+
+test_that("labels, axis titles and legend positions can be changed", {
+  fit <- small_fit()
+  p <- plot(fit, treated_label = "observed target unit",
+            synthetic_label = "synthetic control target unit",
+            donor_label = "donor pool units", xlab = "Period", ylab = "Y",
+            ylim = c(0, 50))
+  expect_equal(p$labels$x, "Period")
+  expect_equal(p$labels$y, "Y")
+  expect_equal(legend_labels(p), c("observed target unit",
+                                   "synthetic control target unit",
+                                   "donor pool units"))
+  for (pos in list("bottomright", "bottomleft", "topright", "topleft",
+                   "bottom", "right", "none", c(0.5, 0.5))) {
+    expect_s3_class(plot(fit, legend_position = pos), "ggplot")
+  }
+  expect_error(plot(fit, legend_position = "middle"), "legend_position")
+  expect_error(plot(fit, legend_position = c(2, 0)), "legend_position")
+  expect_error(plot(fit, treated_label = "a", synthetic_label = "a"),
+               "distinct")
+  expect_error(plot(fit, counterfactual = 1:2), "finite values")
+  expect_error(plot(fit, colours = c(nope = "red")), "colours")
+  p2 <- plot(fit, colours = c(treated = "darkgreen"))
+  expect_equal(unname(ggplot2::ggplot_build(p2)$data[[3]]$colour[1]),
+               "darkgreen")
+  pl <- plot(placebo_test(small_fit(), type = "leave_one_out",
+                          progress = FALSE),
+             xlab = "Month", ylab = "Causal effect")
+  expect_equal(pl$labels$y, "Causal effect")
+  expect_equal(pl$labels$x, "Month")
+})

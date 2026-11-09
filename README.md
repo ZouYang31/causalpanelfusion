@@ -100,6 +100,23 @@ reference domain where the weights were fitted:
 
 <img src="man/figures/README-fit.png" width="640" />
 
+All plots return ggplot objects, and every coloured element has a legend
+entry. The legend sits inside the panel; move it with `legend_position`
+(`"bottomright"`, `"topleft"`, ..., a point `c(x, y)`, or `"bottom"` to
+put it outside). The text, scale and colours can be changed with `xlab`,
+`ylab`, `ylim`, the legend labels (`treated_label`, `synthetic_label`,
+`donor_label`, ...) and `colours`. In simulations, `counterfactual` adds
+the true untreated trajectory as a red line:
+
+```r
+plot(fit, counterfactual = sim$target0[1, ],
+     treated_label = "observed target unit",
+     synthetic_label = "synthetic control target unit",
+     counterfactual_label = "counterfactual target unit",
+     donor_label = "donor pool units",
+     xlab = "Period", ylab = "Outcome in the target domain")
+```
+
 Useful options: `eta_Z`, `eta_X` (balance slack, default 0.1),
 `budget_step` (grid spacing, default 0.01), `solver` (`"ecos"` or
 `"gurobi"`).

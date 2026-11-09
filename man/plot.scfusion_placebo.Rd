@@ -4,14 +4,28 @@
 \alias{plot.scfusion_placebo}
 \title{Plot placebo-test gaps}
 \usage{
-\method{plot}{scfusion_placebo}(x, domain = c("target", "reference"), ylim = NULL, ...)
+\method{plot}{scfusion_placebo}(
+  x,
+  domain = c("target", "reference"),
+  treated_label = NULL,
+  placebo_label = NULL,
+  xlab = "Time",
+  ylab = NULL,
+  ylim = NULL,
+  legend_position = "bottomright",
+  ...
+)
 }
 \arguments{
 \item{x}{An \code{"scfusion_placebo"} object.}
 
 \item{domain}{\code{"target"} (default) or \code{"reference"}.}
 
-\item{ylim}{Optional y-axis limits.}
+\item{treated_label, placebo_label}{Legend labels. Defaults: the treated
+unit's name and "Placebo units" (in-space), or "Original synthetic
+\if{html}{\out{<name>}}" and "Leave-one-out synthetic \if{html}{\out{<name>}}" (leave-one-out).}
+
+\item{xlab, ylab, ylim, legend_position}{As in \code{\link[=plot.scfusion]{plot.scfusion()}}.}
 
 \item{...}{Unused.}
 }
@@ -19,5 +33,8 @@
 A \code{ggplot} object.
 }
 \description{
-Plot placebo-test gaps
+For in-space placebos, the treated unit's gap (black) is drawn against
+the placebo units' gaps (grey). For the leave-one-out test, the gap of the
+original synthetic control (thick black) is drawn against the gaps
+obtained when each positive-weight donor is left out in turn (grey).
 }
