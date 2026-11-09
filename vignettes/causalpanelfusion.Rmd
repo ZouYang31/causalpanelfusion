@@ -178,26 +178,65 @@ plot(ec)
 
 ## Using your own data
 
-Long-format panels are converted with `panel_to_matrix()` and covariates
-with `covariate_matrix()`. Rows are matched by unit name, so the treated
-unit can be given by name. For example, with one file of monthly outcomes
-(columns `unit`, `group`, `month`, `rate`) and one file of covariates:
+`fusion_data()` builds the inputs from data frames, in either of two
+layouts, and `scfusion()` takes the result in place of the four matrices.
+The simulated data come in both layouts.
+
+**Domain as a column** (one row per unit, domain and period):
+
+```{r}
+head(sim$long)
+fd <- fusion_data(sim$long, unit = "unit", time = "time", treated = "treated",
+                  domain = "domain", target = "target", reference = "reference",
+                  outcome = "outcome", covariates = c("cov1", "cov2", "cov3"))
+fd
+```
+
+**Domains as columns** (one row per unit and period); the target outcome is
+missing before the target domain is observed, and those periods are dropped
+automatically:
+
+```{r}
+head(sim$wide[sim$wide$time >= 15, ])
+fd_wide <- fusion_data(sim$wide, unit = "unit", time = "time",
+                       treated = "treated",
+                       outcome = c(target = "y_target",
+                                   reference = "y_reference"),
+                       covariates = list(target = c("X1", "X2", "X3"),
+                                         reference = c("Z1", "Z2", "Z3")))
+```
+
+Covariates are min-max normalised across the units in the analysis by
+default, as in the paper, and their original values are kept, so
+`covariate_balance()` reports them in their own units:
+
+```{r}
+fit_fd <- scfusion(fd, budget_step = 0.05)
+covariate_balance(fit_fd)
+```
+
+Other options:
+
+- `covariate_data` reads the covariates from a separate table.
+- `donors` restricts the donor pool.
+- `target_periods` and `reference_periods` select the periods used in each
+  domain.
+- `covariate_time` and `covariate_summary` handle covariates that change over
+  time.
+- `drop_incomplete = TRUE` drops donors with missing data. By default they
+  cause an error that lists the missing values.
+
+For example, with outcomes in long format and covariates in a separate table
+with one row per city and domain-specific columns:
 
 ```{r, eval = FALSE}
-outcomes <- read.csv("monthly_outcomes.csv")
-covs <- read.csv("covariates.csv")
-
-ref <- subset(outcomes, group == "reference")
-tgt <- subset(outcomes, group == "target")
-Fm <- panel_to_matrix(ref, unit = "unit", time = "month", outcome = "rate")
-Y  <- panel_to_matrix(tgt, unit = "unit", time = "month", outcome = "rate")
-vars <- c("median_income", "median_age", "proportion")
-Z <- covariate_matrix(subset(covs, group == "reference"), "unit", vars,
-                      normalize = TRUE)
-X <- covariate_matrix(subset(covs, group == "target"), "unit", vars,
-                      normalize = TRUE)
-
-fit <- scfusion(Y, Fm, X = X, Z = Z, treated = "Chelsea")
+fd <- fusion_data(vac, unit = "city", time = "month", treated = "Chelsea",
+                  domain = "race", target = "Hispanic", reference = "Black",
+                  outcome = "rate",
+                  covariates = list(target    = c("income_hisp", "share_hisp"),
+                                    reference = c("income_blk", "share_blk")),
+                  covariate_data = city_covariates,
+                  donors = my_donor_cities)
 ```
 
 ## Reference

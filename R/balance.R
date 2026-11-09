@@ -6,15 +6,18 @@
 #'
 #' The weights are usually fitted on rescaled covariates (for example
 #' min-max normalised with [normalize_minmax()]), which are hard to read.
-#' Supply the covariates in their original units through `X` and `Z` to
-#' report the table in those units; the discrepancy on the scale the
+#' Fits built from [fusion_data()] keep the original covariate values and
+#' report them automatically; otherwise supply the covariates in their
+#' original units through `X` and `Z`. The discrepancy on the scale the
 #' balance constraints act on is always given in `gap_fit_scale`.
 #'
 #' @param fit An `"scfusion"` object.
 #' @param X,Z Optional target- and reference-domain covariates in the units
 #'   to report (one row per unit, same columns as used in `fit`). Rows are
 #'   matched by row name when present, otherwise they must be in the same
-#'   order as in `fit`. By default the covariates stored in `fit` are used.
+#'   order as in `fit`. By default the original covariate values kept by
+#'   [fusion_data()] are used if available, otherwise the covariates used
+#'   for fitting.
 #' @param compare Optional named list of further `"scfusion"` fits on the
 #'   same units (for example with a different `eta_X`); their synthetic
 #'   values are added as columns `synthetic_<name>`.
@@ -69,8 +72,10 @@ covariate_balance <- function(fit, X = NULL, Z = NULL, compare = NULL) {
   }
   data <- fit$data
   compare <- .check_compare(compare, fit)
-  Zr <- .reporting_covariates(Z, data$Z, data$unit_names, "Z")
-  Xr <- .reporting_covariates(X, data$X, data$unit_names, "X")
+  default_X <- if (is.null(data$X_raw)) data$X else data$X_raw
+  default_Z <- if (is.null(data$Z_raw)) data$Z else data$Z_raw
+  Zr <- .reporting_covariates(Z, default_Z, data$unit_names, "Z")
+  Xr <- .reporting_covariates(X, default_X, data$unit_names, "X")
 
   one <- function(raw, fitm, domain) {
     tr <- fit$treated
@@ -101,8 +106,9 @@ covariate_balance <- function(fit, X = NULL, Z = NULL, compare = NULL) {
     }
     out
   }
-  out <- rbind(one(Zr, data$Z, "reference (Z)"),
-               one(Xr, data$X, "target (X)"))
+  dn <- .domain_names(data)
+  out <- rbind(one(Zr, data$Z, dn[["reference"]]),
+               one(Xr, data$X, dn[["target"]]))
 
   s <- fit$settings
   allowed <- c(Z = (1 + s$eta_Z) * (1 + fit$baseline[["Z"]]) - 1,
@@ -115,7 +121,8 @@ covariate_balance <- function(fit, X = NULL, Z = NULL, compare = NULL) {
                               vapply(compare, `[[`, numeric(1), "estimate"))
   attr(out, "treated") <- data$unit_names[fit$treated]
   attr(out, "n_units") <- length(data$unit_names)
-  attr(out, "original_units") <- !is.null(X) || !is.null(Z)
+  attr(out, "original_units") <- !is.null(X) || !is.null(Z) ||
+    isTRUE(data$normalized)
   class(out) <- c("scfusion_balance", "data.frame")
   out
 }

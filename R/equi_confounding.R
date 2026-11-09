@@ -14,7 +14,11 @@
 #' reference outcomes over time and \eqn{\bar Y_0}, \eqn{\bar F_0} average
 #' all donors over units and time.
 #'
-#' @inheritParams scfusion
+#' @param target Target-domain outcomes (units by periods), or a
+#'   [fusion_data()] object (then `reference` and `treated` are taken from
+#'   it).
+#' @param reference Reference-domain outcomes (units by periods).
+#' @param treated The treated unit: a row index or a row name.
 #' @param type Which estimator(s) to compute: `"both"` (default),
 #'   `"linear"` or `"log"`.
 #'
@@ -30,6 +34,15 @@
 equi_confounding <- function(target, reference, treated = 1L,
                              type = c("both", "linear", "log")) {
   type <- match.arg(type)
+  if (inherits(target, "fusion_data")) {
+    if (!missing(reference) || !missing(treated)) {
+      stop("When `target` is a fusion_data() object, `reference` and ",
+           "`treated` are taken from it; do not supply them.", call. = FALSE)
+    }
+    reference <- target$reference
+    treated <- target$treated
+    target <- target$target
+  }
   Y <- .as_numeric_matrix(target, "target")
   Fm <- .as_numeric_matrix(reference, "reference")
   if (nrow(Y) != nrow(Fm)) {

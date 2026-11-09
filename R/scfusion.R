@@ -40,7 +40,9 @@
 #' @param target Target-domain outcomes: numeric matrix (or data frame) with
 #'   one row per unit and one column per post-intervention period (the
 #'   paper's \eqn{Y}). The treated unit's row holds its observed (treated)
-#'   outcomes.
+#'   outcomes. Alternatively a [fusion_data()] object, in which case
+#'   `reference`, `X`, `Z` and `treated` are taken from it and must not be
+#'   supplied.
 #' @param reference Reference-domain outcomes, units by periods (the paper's
 #'   \eqn{F}). Unaffected by the intervention for every unit.
 #' @param X Target-domain covariates, units by covariates.
@@ -57,10 +59,14 @@
 #'   Default `0.005`.
 #' @param keep_path If `TRUE`, store \eqn{NSE_F} for every candidate budget.
 #'
-#' @details If all four inputs have row names, rows are matched by name (the
-#'   order of `target` is used); otherwise rows must already be aligned.
-#'   Covariates should be on comparable scales (the paper min-max normalises
-#'   them; see [normalize_minmax()]).
+#' @details Data frames in long or wide layouts are easiest to pass through
+#'   [fusion_data()], which also normalises the covariates and keeps their
+#'   original values for [covariate_balance()].
+#'
+#'   With matrices: if all four inputs have row names, rows are matched by
+#'   name (the order of `target` is used); otherwise rows must already be
+#'   aligned. Covariates should be on comparable scales (the paper min-max
+#'   normalises them; see [normalize_minmax()]).
 #'
 #' @return An object of class `"scfusion"`, a list with elements
 #' \describe{
@@ -101,6 +107,21 @@ scfusion <- function(target, reference, X, Z, treated = 1L,
                      solver = c("ecos", "gurobi"),
                      weight_threshold = 0.005, keep_path = FALSE) {
   cl <- match.call()
+  fd <- NULL
+  if (inherits(target, "fusion_data")) {
+    if (!missing(reference) || !missing(X) || !missing(Z) ||
+        !missing(treated)) {
+      stop("When `target` is a fusion_data() object, `reference`, `X`, `Z` ",
+           "and `treated` are taken from it; do not supply them.",
+           call. = FALSE)
+    }
+    fd <- target
+    target <- fd$target
+    reference <- fd$reference
+    X <- fd$X
+    Z <- fd$Z
+    treated <- fd$treated
+  }
   solver <- match.arg(solver)
   .check_scalar(eta_Z, "eta_Z", lower = 0)
   .check_scalar(eta_X, "eta_X", lower = 0)
@@ -109,6 +130,13 @@ scfusion <- function(target, reference, X, Z, treated = 1L,
   if (solver == "gurobi") .require_gurobi()
 
   data <- .prepare_fusion_data(target, reference, X, Z, treated)
+  if (!is.null(fd)) {
+    data$X_raw <- fd$X_raw[data$unit_names, , drop = FALSE]
+    data$Z_raw <- fd$Z_raw[data$unit_names, , drop = FALSE]
+    data$normalized <- fd$normalize
+    data$labels <- fd$labels
+    data$axis_labels <- fd$axis_labels
+  }
   budgets <- .resolve_budgets(budgets, budget_step, budget_min)
   settings <- list(
     eta_Z = eta_Z, eta_X = eta_X, solver = solver,
@@ -279,7 +307,21 @@ scfusion <- function(target, reference, X, Z, treated = 1L,
       stringsAsFactors = FALSE
     )
   }
-  rbind(one(data$Z, "reference (Z)"), one(data$X, "target (X)"))
+  dn <- .domain_names(data)
+  rbind(one(data$Z, dn[["reference"]]), one(data$X, dn[["target"]]))
+}
+
+# Domain labels for tables: "target (Hispanic)" with fusion_data() input,
+# otherwise "target (X)" / "reference (Z)".
+.domain_names <- function(data) {
+  if (is.null(data$labels)) {
+    return(c(reference = "reference (Z)", target = "target (X)"))
+  }
+  lab <- function(d) {
+    l <- data$labels[[d]]
+    if (identical(tolower(l), d)) d else sprintf("%s (%s)", d, l)
+  }
+  c(reference = lab("reference"), target = lab("target"))
 }
 
 #' @export

@@ -26,8 +26,17 @@ methods of the paper.
   with a `plot()` method for the equi-confounding diagram.
 * `simulate_fusion_data()` draws from the paper's factor model
   (`seed = 45` reproduces `main_example.R`).
+* `fusion_data()` builds the inputs from data frames, either with the domain
+  as a column (one row per unit, domain and period) or with the domains as
+  columns (one row per unit and period), optionally with covariates in a
+  separate table. It selects donors and periods, handles time-varying
+  covariates and missing data, and min-max normalises the covariates while
+  keeping their original values. `scfusion()` and `equi_confounding()`
+  accept the result, and domain labels carry through to tables and plots.
+  `simulate_fusion_data()` also returns its data in both layouts.
 * `panel_to_matrix()`, `covariate_matrix()` and `normalize_minmax()` prepare
-  data; inputs are aligned by row name and the treated unit can be named.
+  matrices by hand; matrix inputs are aligned by row name and the treated
+  unit can be named.
 
 ## Changes
 

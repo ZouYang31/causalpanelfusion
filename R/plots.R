@@ -39,8 +39,11 @@ plot.scfusion <- function(x, type = c("target", "reference", "gaps"),
   M <- if (type == "target") x$data$target else x$data$reference
   syn <- if (type == "target") x$synthetic_target else x$synthetic_reference
   if (is.null(ylab)) {
-    ylab <- if (type == "target") "Outcome (target domain)" else
-      "Outcome (reference domain)"
+    ylab <- if (is.null(x$data$axis_labels)) {
+      sprintf("Outcome (%s domain)", type)
+    } else {
+      sprintf("%s (%s domain)", x$data$axis_labels[[type]], type)
+    }
   }
   n_t <- ncol(M)
   donors <- data.frame(

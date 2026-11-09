@@ -18,7 +18,7 @@ It implements the methods of
 | **Prediction intervals** | `scfusion_pi()`, `pi_bands()`: bootstrap of the weight-construction error + donor-placebo calibration of the transfer error (location-scale and sub-Gaussian constructions), average and per-period |
 | **Diagnostics** | `covariate_balance()`, `placebo_test()` (in-space, leave-one-out), `rmspe_test()`, `eta_sensitivity()`, `sensitivity_pi()` |
 | **Equi-confounding data fusion** | `equi_confounding()`: linear and logarithmic estimators |
-| **Utilities** | `simulate_fusion_data()`, `panel_to_matrix()`, `covariate_matrix()`, `normalize_minmax()` |
+| **Data input** | `fusion_data()`: build the inputs from long or wide data frames; `panel_to_matrix()`, `covariate_matrix()`, `normalize_minmax()`, `simulate_fusion_data()` |
 
 ## Installation
 
@@ -129,10 +129,11 @@ covariate_balance(fit)
 `treated_rank` flags covariates on which the treated unit sits at the edge
 of the donor pool (rank 1 = largest), where no weighted average of donors can
 match it closely. The footer compares the fitted discrepancies with the best
-attainable values and the limits allowed by `eta_Z` and `eta_X`. Pass
-covariates in their original units through `X` and `Z` to report the table
-in those units, and other fits through `compare` to show them side by side
-(see [Using your own data](#using-your-own-data)).
+attainable values and the limits allowed by `eta_Z` and `eta_X`. Fits built
+with `fusion_data()` (see [Using your own data](#using-your-own-data)) report
+the covariates in their original units; with matrices, pass the original
+values through `X` and `Z`. Other fits passed through `compare` are shown
+side by side.
 
 ### 2. Prediction intervals
 
@@ -238,61 +239,68 @@ plot(ec)
 
 ### Using your own data
 
-Data usually come in long format. `panel_to_matrix()` and
-`covariate_matrix()` build the four inputs. Rows are matched by unit name, so
-the files can be in any order. For example:
+`fusion_data()` builds the inputs from data frames in the layout your data
+already have, and `scfusion()` takes the result in place of the four
+matrices. Two layouts are supported.
+
+**Domain as a column**: one row per unit, domain and period:
 
 ```
-# outcomes.csv: one row per unit, domain and period
-unit,domain,period,outcome
-unit_A,reference,2021-01,12.3
-unit_A,target,2021-01,17.5
-unit_B,reference,2021-01,9.0
-...
-
-# covariates.csv: one row per unit and domain
-unit,domain,median_income,median_age,proportion
-unit_A,reference,84443,30.1,0.77
-unit_A,target,51210,27.9,0.35
+city      race      month    rate  income  share  age
+Chelsea   Hispanic  2021-03  0.07  71989   0.66   31.3
+Chelsea   Black     2021-03  0.11  53994   0.07   33.5
 ...
 ```
 
 ```r
-outcomes   <- read.csv("outcomes.csv")
-covariates <- read.csv("covariates.csv")
-
-reference <- panel_to_matrix(subset(outcomes, domain == "reference"),
-                             unit = "unit", time = "period", outcome = "outcome")
-target    <- panel_to_matrix(subset(outcomes, domain == "target"),
-                             unit = "unit", time = "period", outcome = "outcome")
-
-vars <- c("median_income", "median_age", "proportion")
-Z <- covariate_matrix(subset(covariates, domain == "reference"),
-                      unit = "unit", covariates = vars, normalize = TRUE)
-X <- covariate_matrix(subset(covariates, domain == "target"),
-                      unit = "unit", covariates = vars, normalize = TRUE)
-
-fit <- scfusion(target, reference, X = X, Z = Z, treated = "unit_A")
+fd <- fusion_data(df, unit = "city", time = "month", treated = "Chelsea",
+                  domain = "race", target = "Hispanic", reference = "Black",
+                  outcome = "rate", covariates = c("income", "share", "age"))
 ```
 
-`normalize = TRUE` min-max scales each covariate to [0, 1], as in the paper,
-so that covariates on different scales are balanced comparably. To read the
-covariate balance in the original units, build the same matrices without
-normalising and pass them to `covariate_balance()`; `compare` adds the
-synthetic values of other fits as extra columns:
+**Domains as columns**: one row per unit and period:
+
+```
+city      month    vac_hisp  vac_black  income_hisp  income_black  ...
+Chelsea   2021-03  0.07      0.11       71989        53994
+...
+```
 
 ```r
-X_raw <- covariate_matrix(subset(covariates, domain == "target"),
-                          unit = "unit", covariates = vars)
-Z_raw <- covariate_matrix(subset(covariates, domain == "reference"),
-                          unit = "unit", covariates = vars)
-covariate_balance(fit, X = X_raw, Z = Z_raw)
-
-fit_tight <- scfusion(target, reference, X = X, Z = Z, treated = "unit_A",
-                      eta_X = 0.01)
-covariate_balance(fit, X = X_raw, Z = Z_raw,
-                  compare = list(eta_X_0.01 = fit_tight))
+fd <- fusion_data(df, unit = "city", time = "month", treated = "Chelsea",
+                  outcome = c(target = "vac_hisp", reference = "vac_black"),
+                  covariates = list(target    = c("income_hisp", "share_hisp", "age_hisp"),
+                                    reference = c("income_black", "share_black", "age_black")),
+                  target = "Hispanic", reference = "Black")   # labels for output
 ```
+
+Either way:
+
+```r
+fd                        # units, periods and covariates of each domain
+fit <- scfusion(fd)
+covariate_balance(fit)    # balance table in the covariates' original units
+```
+
+Other options:
+- `covariate_data`: take the covariates from a separate table, for example one
+  row per unit with domain-specific columns.
+- `donors`: restrict the donor pool.
+- `target_periods`, `reference_periods`: choose the periods used in each
+  domain. By default each domain uses every period in which its outcome is
+  observed.
+- `covariate_time`, `covariate_summary`: handle covariates that change over
+  time.
+- `drop_incomplete = TRUE`: drop donors with missing data instead of
+  stopping with an error that lists them.
+- `normalize`: covariates are min-max normalized across the units in the
+  analysis by default, as in the paper. The original values are kept for
+  `covariate_balance()`.
+
+`simulate_fusion_data()` returns its data in both layouts (`sim$long`,
+`sim$wide`) for trying this out. If your data are already matrices,
+`scfusion()` takes them directly, and `panel_to_matrix()` and
+`covariate_matrix()` help build them.
 
 See `vignette("causalpanelfusion")` for a longer walk-through.
 

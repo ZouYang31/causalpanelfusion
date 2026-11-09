@@ -14,6 +14,7 @@ from a related reference domain observed for the same units.
 \details{
 Main functions:
 \itemize{
+\item \code{\link[=fusion_data]{fusion_data()}}: build the inputs from long or wide data frames.
 \item \code{\link[=scfusion]{scfusion()}}: synthetic control data fusion (data-driven
 constrained weights); \code{\link[=covariate_balance]{covariate_balance()}} for the balance table.
 \item \code{\link[=scfusion_pi]{scfusion_pi()}}, \code{\link[=pi_bands]{pi_bands()}}: prediction intervals for the

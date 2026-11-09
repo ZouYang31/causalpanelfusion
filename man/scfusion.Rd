@@ -24,7 +24,9 @@ scfusion(
 \item{target}{Target-domain outcomes: numeric matrix (or data frame) with
 one row per unit and one column per post-intervention period (the
 paper's \eqn{Y}). The treated unit's row holds its observed (treated)
-outcomes.}
+outcomes. Alternatively a \code{\link[=fusion_data]{fusion_data()}} object, in which case
+\code{reference}, \code{X}, \code{Z} and \code{treated} are taken from it and must not be
+supplied.}
 
 \item{reference}{Reference-domain outcomes, units by periods (the paper's
 \eqn{F}). Unaffected by the intervention for every unit.}
@@ -74,10 +76,14 @@ weights are learned in the reference domain and transported to the target
 domain.
 }
 \details{
-If all four inputs have row names, rows are matched by name (the
-order of \code{target} is used); otherwise rows must already be aligned.
-Covariates should be on comparable scales (the paper min-max normalises
-them; see \code{\link[=normalize_minmax]{normalize_minmax()}}).
+Data frames in long or wide layouts are easiest to pass through
+\code{\link[=fusion_data]{fusion_data()}}, which also normalises the covariates and keeps their
+original values for \code{\link[=covariate_balance]{covariate_balance()}}.
+
+With matrices: if all four inputs have row names, rows are matched by
+name (the order of \code{target} is used); otherwise rows must already be
+aligned. Covariates should be on comparable scales (the paper min-max
+normalises them; see \code{\link[=normalize_minmax]{normalize_minmax()}}).
 }
 \section{Algorithm}{
 

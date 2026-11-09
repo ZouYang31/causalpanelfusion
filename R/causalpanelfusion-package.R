@@ -7,6 +7,7 @@
 #'
 #' Main functions:
 #' \itemize{
+#'   \item [fusion_data()]: build the inputs from long or wide data frames.
 #'   \item [scfusion()]: synthetic control data fusion (data-driven
 #'     constrained weights); [covariate_balance()] for the balance table.
 #'   \item [scfusion_pi()], [pi_bands()]: prediction intervals for the

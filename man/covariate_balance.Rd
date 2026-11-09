@@ -15,7 +15,9 @@ covariate_balance(fit, X = NULL, Z = NULL, compare = NULL)
 \item{X, Z}{Optional target- and reference-domain covariates in the units
 to report (one row per unit, same columns as used in \code{fit}). Rows are
 matched by row name when present, otherwise they must be in the same
-order as in \code{fit}. By default the covariates stored in \code{fit} are used.}
+order as in \code{fit}. By default the original covariate values kept by
+\code{\link[=fusion_data]{fusion_data()}} are used if available, otherwise the covariates used
+for fitting.}
 
 \item{compare}{Optional named list of further \code{"scfusion"} fits on the
 same units (for example with a different \code{eta_X}); their synthetic
@@ -56,8 +58,9 @@ covariate balance table reported in synthetic control studies.
 \details{
 The weights are usually fitted on rescaled covariates (for example
 min-max normalised with \code{\link[=normalize_minmax]{normalize_minmax()}}), which are hard to read.
-Supply the covariates in their original units through \code{X} and \code{Z} to
-report the table in those units; the discrepancy on the scale the
+Fits built from \code{\link[=fusion_data]{fusion_data()}} keep the original covariate values and
+report them automatically; otherwise supply the covariates in their
+original units through \code{X} and \code{Z}. The discrepancy on the scale the
 balance constraints act on is always given in \code{gap_fit_scale}.
 
 Weights below the threshold of \code{\link[=scfusion]{scfusion()}} are set to zero

@@ -41,7 +41,19 @@ default drawn as sorted \eqn{U(2, 5)} values.}
 A list with \code{target} (observed target outcomes, effect added to
 unit 1), \code{target0} (untreated target potential outcomes), \code{reference},
 \code{X}, \code{Z}, \code{mu}, \code{effect}, \code{psi} (the true average effect), \code{treated}
-(= 1) and \code{params} (the drawn coefficients).
+(= 1), \code{params} (the drawn coefficients), and the same observed data as
+two data frames for trying out \code{\link[=fusion_data]{fusion_data()}}:
+\describe{
+\item{\code{long}}{One row per unit, domain and period: columns \code{unit},
+\code{domain} (\code{"target"}/\code{"reference"}), \code{time}, \code{outcome} and
+covariates \code{cov1}, \code{cov2}, ... (the \code{Z} values in reference rows,
+the \code{X} values in target rows).}
+\item{\code{wide}}{One row per unit and period: columns \code{unit}, \code{time},
+\code{y_reference}, \code{y_target} and covariates \code{Z1}, ..., \code{X1}, ....}
+}
+The reference domain is observed in periods \verb{1, ..., n_ref} and the
+target domain in the last \code{n_target} of them (\code{y_target} is \code{NA}
+before).
 }
 \description{
 Generates reference- and target-domain panels for one treated unit and

@@ -12,13 +12,11 @@ equi_confounding(
 )
 }
 \arguments{
-\item{target}{Target-domain outcomes: numeric matrix (or data frame) with
-one row per unit and one column per post-intervention period (the
-paper's \eqn{Y}). The treated unit's row holds its observed (treated)
-outcomes.}
+\item{target}{Target-domain outcomes (units by periods), or a
+\code{\link[=fusion_data]{fusion_data()}} object (then \code{reference} and \code{treated} are taken from
+it).}
 
-\item{reference}{Reference-domain outcomes, units by periods (the paper's
-\eqn{F}). Unaffected by the intervention for every unit.}
+\item{reference}{Reference-domain outcomes (units by periods).}
 
 \item{treated}{The treated unit: a row index or a row name.}
 

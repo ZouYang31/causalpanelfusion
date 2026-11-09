@@ -26,7 +26,19 @@
 #' @return A list with `target` (observed target outcomes, effect added to
 #'   unit 1), `target0` (untreated target potential outcomes), `reference`,
 #'   `X`, `Z`, `mu`, `effect`, `psi` (the true average effect), `treated`
-#'   (= 1) and `params` (the drawn coefficients).
+#'   (= 1), `params` (the drawn coefficients), and the same observed data as
+#'   two data frames for trying out [fusion_data()]:
+#'   \describe{
+#'     \item{`long`}{One row per unit, domain and period: columns `unit`,
+#'       `domain` (`"target"`/`"reference"`), `time`, `outcome` and
+#'       covariates `cov1`, `cov2`, ... (the `Z` values in reference rows,
+#'       the `X` values in target rows).}
+#'     \item{`wide`}{One row per unit and period: columns `unit`, `time`,
+#'       `y_reference`, `y_target` and covariates `Z1`, ..., `X1`, ....}
+#'   }
+#'   The reference domain is observed in periods `1, ..., n_ref` and the
+#'   target domain in the last `n_target` of them (`y_target` is `NA`
+#'   before).
 #' @examples
 #' sim <- simulate_fusion_data(seed = 45)
 #' dim(sim$reference); dim(sim$target)
@@ -85,6 +97,61 @@ simulate_fusion_data <- function(n_units = 31L, n_ref = 20L, n_target = 5L,
     target = Y, target0 = Y0, reference = Fm, X = X, Z = Z, mu = mu,
     effect = effect, psi = mean(effect), treated = 1L,
     params = list(rho = rho, phi = phi, theta = theta, varrho = varrho,
-                  varphi = varphi, vartheta = vartheta)
+                  varphi = varphi, vartheta = vartheta),
+    long = .sim_long(Y, Fm, X, Z),
+    wide = .sim_wide(Y, Fm, X, Z)
   )
+}
+
+# Time indices: reference 1..T, target the last S of them.
+.sim_times <- function(T, S) {
+  list(ref = seq_len(T), tgt = seq_len(S) + max(T - S, 0L))
+}
+
+.sim_long <- function(Y, Fm, X, Z) {
+  N <- nrow(Y)
+  units <- rownames(Y)
+  tm <- .sim_times(ncol(Fm), ncol(Y))
+  K <- max(ncol(X), ncol(Z))
+  pad <- function(M) {
+    out <- matrix(NA_real_, N, K, dimnames = list(NULL, paste0("cov",
+                                                                seq_len(K))))
+    out[, seq_len(ncol(M))] <- M
+    out
+  }
+  block <- function(M, C, dom, times) {
+    nt <- length(times)
+    data.frame(
+      unit = rep(units, each = nt),
+      domain = dom,
+      time = rep(times, N),
+      outcome = as.vector(t(M)),
+      pad(C)[rep(seq_len(N), each = nt), , drop = FALSE],
+      stringsAsFactors = FALSE
+    )
+  }
+  out <- rbind(block(Fm, Z, "reference", tm$ref),
+               block(Y, X, "target", tm$tgt))
+  out <- out[order(match(out$unit, units), out$domain, out$time), ]
+  rownames(out) <- NULL
+  out
+}
+
+.sim_wide <- function(Y, Fm, X, Z) {
+  N <- nrow(Y)
+  units <- rownames(Y)
+  tm <- .sim_times(ncol(Fm), ncol(Y))
+  times <- sort(unique(c(tm$ref, tm$tgt)))
+  nt <- length(times)
+  iu <- rep(seq_len(N), each = nt)
+  it <- rep(times, N)
+  out <- data.frame(
+    unit = units[iu], time = it,
+    y_reference = Fm[cbind(iu, match(it, tm$ref))],
+    y_target = Y[cbind(iu, match(it, tm$tgt))],
+    stringsAsFactors = FALSE
+  )
+  out <- cbind(out, Z[iu, , drop = FALSE], X[iu, , drop = FALSE])
+  rownames(out) <- NULL
+  out
 }
