@@ -34,10 +34,9 @@ methods of the paper.
   keeping their original values. `scfusion()` and `equi_confounding()`
   accept the result, and domain labels carry through to tables and plots.
   `simulate_fusion_data()` also returns its data in both layouts.
-* `inst/scripts/simulation_example.R` is a worked example on simulated data:
-  the full analysis of one data set checked against the true effect, and a
-  Monte Carlo study of estimator bias as the number of reference periods
-  grows.
+* `inst/scripts/simulation_example.R` is a worked example on simulated data
+  (following `main_example.R`): the full analysis of one data set, checked
+  against the true effect.
 * `panel_to_matrix()`, `covariate_matrix()` and `normalize_minmax()` prepare
   matrices by hand; matrix inputs are aligned by row name and the treated
   unit can be named.

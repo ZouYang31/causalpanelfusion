@@ -320,8 +320,8 @@ Other options:
 `covariate_matrix()` help build them.
 
 See `vignette("causalpanelfusion")` for a longer walk-through. A complete
-worked example on simulated data (every step checked against the true
-effect, plus a small Monte Carlo study of bias) ships with the package:
+worked example on simulated data, with every step checked against the true
+effect, ships with the package:
 
 ```r
 file.edit(system.file("scripts", "simulation_example.R",

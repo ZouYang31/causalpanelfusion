@@ -1,17 +1,13 @@
 ##############################################################################
 # causalpanelfusion: worked example on simulated data
 #
-# Part A follows main_example.R: one data set from the paper's factor model
-#         (31 units, T = 20 reference periods, S = 5 target periods,
-#         seed 45), taken through every step of the analysis and checked
-#         against the true effect, which is known in a simulation.
-# Part B follows main_simulation.R: a Monte Carlo study of the bias of the
-#         synthetic-control and equi-confounding estimators as the number of
-#         reference periods T grows (design held fixed, noise redrawn).
+# Follows main_example.R: one data set from the paper's factor model
+# (31 units, T = 20 reference periods, S = 5 target periods, seed 45), taken
+# through every step of the analysis and checked against the true effect,
+# which is known in a simulation.
 #
-# Set `quick <- FALSE` for the paper's settings (500 bootstrap refits, full
-# budget grid for every refit, 300 Monte Carlo replications for
-# T = 10, 20, ..., 100). The quick settings run in a few minutes.
+# Set `quick <- FALSE` for the paper's settings (500 bootstrap refits with the
+# full budget grid for every refit). The quick settings run in a few minutes.
 ##############################################################################
 
 library(causalpanelfusion)
@@ -20,22 +16,9 @@ library(ggplot2)
 quick <- TRUE
 
 settings <- if (quick) {
-  list(B = 100, refit_step = 0.05,                 # prediction intervals
-       mc_T = c(10, 20, 50), mc_reps = 30, mc_step = 0.05)
+  list(B = 100, refit_step = 0.05)     # coarser budget grid for the refits
 } else {
-  list(B = 500, refit_step = NULL,                 # NULL = full 0.01 grid
-       mc_T = seq(10, 100, by = 10), mc_reps = 300, mc_step = 0.01)
-}
-
-# Legend inside the panel for the hand-made Monte Carlo plots (ggplot2 3.5
-# changed how inside legends are specified)
-inside_legend <- function(pos = c(0.98, 0.98)) {
-  if (utils::packageVersion("ggplot2") >= "3.5.0") {
-    theme(legend.position = "inside", legend.position.inside = pos,
-          legend.justification = pos)
-  } else {
-    theme(legend.position = pos, legend.justification = pos)
-  }
+  list(B = 500, refit_step = NULL)     # NULL = full 0.01 grid
 }
 
 # Figures are shown on screen and saved here
@@ -46,16 +29,11 @@ save_fig <- function(p, name, width = 8, height = 6) {
   ggsave(file.path(out_dir, name), p, width = width, height = height)
 }
 
-# Refits (bootstrap, placebos, Monte Carlo) run on all cores; results are
-# identical to a serial run.
+# Refits (bootstrap, placebos) run on all cores; results are identical to a
+# serial run.
 future::plan(future::multisession)
 
-
-# ============================================================================
-# Part A. One simulated data set
-# ============================================================================
-
-# ---- A1. Simulate ------------------------------------------------------------
+# ---- 1. Simulate -----------------------------------------------------------
 # Same draws as main_example.R with set.seed(45). Unit 1 ("treated") receives
 # the effect in the target domain; target0 holds its untreated outcomes.
 sim <- simulate_fusion_data(seed = 45)
@@ -68,7 +46,7 @@ sim$psi                     # true average effect
 head(sim$long)              # one row per unit, domain and period
 head(sim$wide)              # one row per unit and period
 
-# ---- A2. Synthetic control data fusion ----------------------------------------
+# ---- 2. Synthetic control data fusion --------------------------------------
 # Matrices can be passed directly ...
 fit <- scfusion(sim$target, sim$reference, X = sim$X, Z = sim$Z,
                 eta_Z = 0.1, eta_X = 0.1)
@@ -104,7 +82,7 @@ save_fig(plot(fit, type = "reference",
               ylab = "Outcome in the reference domain", ylim = c(5, 50)),
          "sim_reference.pdf")
 
-# ---- A3. Equi-confounding data fusion ------------------------------------------
+# ---- 3. Equi-confounding data fusion ---------------------------------------
 ec <- equi_confounding(sim$target, sim$reference)
 ec
 save_fig(plot(ec), "sim_equi_confounding.pdf", 6, 5)
@@ -118,7 +96,7 @@ estimates <- data.frame(
 estimates$bias <- estimates$estimate - sim$psi
 estimates
 
-# ---- A4. Prediction intervals --------------------------------------------------
+# ---- 4. Prediction intervals -----------------------------------------------
 # alpha1 = alpha2 = 0.1 as in main_real_data.R (nominal level 80%).
 pi <- scfusion_pi(fit, alpha1 = 0.1, alpha2 = 0.1, B = settings$B,
                   budget_step = settings$refit_step, seed = 1234,
@@ -156,7 +134,7 @@ sens <- sensitivity_pi(pi)
 sens
 save_fig(plot(sens), "sim_sensitivity_PI.pdf", 7, 5)
 
-# ---- A5. Placebo tests ------------------------------------------------------------
+# ---- 5. Placebo tests ------------------------------------------------------
 # In-space placebos (treated unit kept in the donor pools, as in Abadie et
 # al. 2010; cf. placebo_F.pdf / placebo_Y.pdf)
 pl <- placebo_test(fit, parallel = TRUE)
@@ -181,113 +159,16 @@ save_fig(plot(loo, domain = "target",
               ylab = "Causal Effect"),
          "sim_LODO_target.pdf")
 
-# ---- A6. Sensitivity to the balance slack -------------------------------------------
+# ---- 6. Sensitivity to the balance slack -----------------------------------
 es <- eta_sensitivity(fit, eta_Z = c(0.05, 0.1, 0.2), eta_X = c(0.05, 0.1, 0.2),
                       parallel = TRUE)
 es[, c("eta_Z", "eta_X", "estimate", "NSE_F", "NSE_Z", "NSE_X", "n_donors")]
 save_fig(plot(es), "sim_eta_heatmap.pdf", 7, 5)
 
-
-# ============================================================================
-# Part B. Monte Carlo study (cf. main_simulation.R)
-# ============================================================================
-# The design (latent confounder mu, covariates Z and X, time effects and
-# loadings, true effects) is drawn once and held fixed; each replication
-# redraws the idiosyncratic noise in both domains and refits. The first T
-# of max(T) reference periods are used. Bias = estimate - truth for all three
-# estimators.
-
-design <- simulate_fusion_data(n_ref = max(settings$mc_T), seed = 45)
-
-one_replication <- function(T, design, budget_step) {
-  N <- nrow(design$Z)
-  S <- ncol(design$target)
-  p <- design$params
-  ones <- rep(1, N)
-  Fm <- outer(ones, p$rho[seq_len(T)]) +
-    design$Z %*% t(p$phi[seq_len(T), , drop = FALSE]) +
-    design$mu %*% t(p$theta[seq_len(T), , drop = FALSE]) +
-    matrix(rnorm(N * T, 0, sqrt(2)), N, T)
-  Y <- outer(ones, p$varrho) + design$X %*% t(p$varphi) +
-    design$mu %*% t(p$vartheta) + matrix(rnorm(N * S, 0, sqrt(1 / 2)), N, S)
-  Y[1, ] <- Y[1, ] + design$effect          # treated unit receives the effect
-
-  fit <- scfusion(Y, Fm, X = design$X, Z = design$Z, budget_step = budget_step)
-  ec <- equi_confounding(Y, Fm)
-  w <- fit$weights
-  mu_gap <- design$mu[1, ] - colSums(design$mu[-1, , drop = FALSE] * w)
-  c(T = T,
-    bias_sc = fit$estimate - design$psi,
-    bias_linear = ec$estimate[["linear"]] - design$psi,
-    bias_log = ec$estimate[["log"]] - design$psi,
-    nse_mu = sum(mu_gap^2) / length(mu_gap),
-    nse_Z = fit$nse[["Z"]], nse_X = fit$nse[["X"]], nse_F = fit$nse[["F"]])
-}
-
-set.seed(2026)
-jobs <- rep(settings$mc_T, each = settings$mc_reps)
-mc <- future.apply::future_lapply(jobs, one_replication, design = design,
-                                  budget_step = settings$mc_step,
-                                  future.seed = TRUE)
-mc <- as.data.frame(do.call(rbind, mc))
-
-# Mean bias, its Monte Carlo standard error, and RMSE by T
-summarise_mc <- function(v) {
-  c(mean = mean(v), se = stats::sd(v) / sqrt(length(v)),
-    rmse = sqrt(mean(v^2)))
-}
-mc_summary <- do.call(rbind, lapply(split(mc, mc$T), function(d) {
-  data.frame(
-    T = d$T[1],
-    estimator = c("synthetic control", "linear equi-conf.", "log equi-conf."),
-    t(sapply(d[c("bias_sc", "bias_linear", "bias_log")], summarise_mc)),
-    row.names = NULL)
-}))
-mc_summary
-
-# Box plots of the bias by T (cf. bias_plot())
-bias_long <- data.frame(
-  T = factor(rep(mc$T, 3), levels = settings$mc_T),
-  estimator = factor(rep(c("synthetic control", "linear equi-confounding",
-                           "log equi-confounding"), each = nrow(mc)),
-                     levels = c("synthetic control", "linear equi-confounding",
-                                "log equi-confounding")),
-  bias = c(mc$bias_sc, mc$bias_linear, mc$bias_log)
-)
-p_bias <- ggplot(bias_long, aes(x = T, y = bias, fill = estimator)) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_boxplot(outlier.shape = NA) +
-  scale_fill_manual(values = c("grey70", "#3B75AF", "#C0504D"), name = NULL) +
-  labs(x = "Number of reference periods T", y = "Bias (estimate - truth)") +
-  theme_minimal(base_size = 14) +
-  inside_legend() +
-  theme(legend.background = element_rect(fill = alpha("grey", 0.5),
-                                         colour = NA))
-save_fig(p_bias, "sim_mc_bias.pdf")
-
-# Box plots of the normalised squared errors of mu, Z and X (cf. NSE_plot_ZX)
-nse_long <- data.frame(
-  T = factor(rep(mc$T, 3), levels = settings$mc_T),
-  quantity = factor(rep(c("NSE(mu)", "NSE(Z)", "NSE(X)"), each = nrow(mc)),
-                    levels = c("NSE(mu)", "NSE(Z)", "NSE(X)")),
-  value = c(mc$nse_mu, mc$nse_Z, mc$nse_X)
-)
-p_nse <- ggplot(nse_long, aes(x = T, y = value, fill = quantity)) +
-  geom_boxplot(outlier.shape = NA) +
-  scale_fill_manual(values = c("#59A14F", "#9C6ADE", "#F28E2B"), name = NULL,
-                    labels = c(expression(NSE(mu[1])), expression(NSE(Z[1])),
-                               expression(NSE(X[1])))) +
-  labs(x = "Number of reference periods T", y = "NSE") +
-  theme_minimal(base_size = 14) +
-  inside_legend() +
-  theme(legend.background = element_rect(fill = alpha("grey", 0.5),
-                                         colour = NA))
-save_fig(p_nse, "sim_mc_nse.pdf")
-
-# Keep everything for later
+# ---- 7. Save ---------------------------------------------------------------
 saveRDS(list(sim = sim, fit = fit, equi = ec, estimates = estimates, pi = pi,
              placebo = pl, rmspe = rt, loo = loo, eta = es, sens = sens,
-             mc = mc, mc_summary = mc_summary, settings = settings),
+             settings = settings),
         file.path(out_dir, "simulation_example_results.rds"))
 
 future::plan(future::sequential)
