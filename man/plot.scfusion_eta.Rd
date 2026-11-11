@@ -7,6 +7,10 @@
 \method{plot}{scfusion_eta}(
   x,
   value = "estimate",
+  colours = c("#EAF2FB", "#6BAED6"),
+  limits = NULL,
+  legend_title = value,
+  text_colour = "black",
   xlab = expression(eta[X]),
   ylab = expression(eta[Z]),
   legend_position = "right",
@@ -17,6 +21,22 @@
 \item{x}{An \code{"scfusion_eta"} object.}
 
 \item{value}{Column to display (default \code{"estimate"}).}
+
+\item{colours}{Colours of the scale, from the smallest to the largest
+value: two colours for a simple gradient or more for a multi-step one,
+e.g. \code{colours = c("white", "orange", "red")}.}
+
+\item{limits}{Optional range \code{c(low, high)} of the colour scale. By
+default the scale stretches over the values shown, so even negligible
+differences span the full range of colours; set e.g.
+\code{limits = c(0, 5)} to colour the tiles on a fixed range instead (values
+outside it are drawn grey).}
+
+\item{legend_title}{Title of the colour bar; defaults to the name of the
+displayed column.}
+
+\item{text_colour}{Colour of the numbers printed in the tiles (use a
+light colour on a dark scale).}
 
 \item{xlab, ylab}{Axis labels.}
 

@@ -86,3 +86,25 @@ test_that("labels, axis titles and legend positions can be changed", {
   expect_equal(pl$labels$y, "Causal effect")
   expect_equal(pl$labels$x, "Month")
 })
+
+test_that("eta heat map colours and legend title can be changed", {
+  es <- eta_sensitivity(small_fit(), eta_Z = c(0.1, 0.3), eta_X = c(0.1, 0.3),
+                        progress = FALSE)
+  tiles <- function(p) ggplot2::ggplot_build(p)$data[[1]]
+  d0 <- tiles(plot(es))
+  d1 <- tiles(plot(es, colours = c("white", "red")))
+  if (length(unique(d0$fill)) > 1L) {
+    expect_false(identical(d0$fill, d1$fill))
+    expect_true(all(c("#FFFFFF", "#FF0000") %in% toupper(d1$fill)))
+  }
+  p <- plot(es, colours = c("white", "orange", "red"),
+            legend_title = "Causal effect", text_colour = "grey20")
+  expect_equal(p$scales$get_scales("fill")$name, "Causal effect")
+  expect_equal(unique(ggplot2::ggplot_build(p)$data[[2]]$colour), "grey20")
+  expect_error(plot(es, colours = "red"), "at least two")
+  lim <- range(es$estimate) + c(-1, 1)
+  d2 <- tiles(plot(es, limits = lim))
+  expect_true(all(!is.na(d2$fill)))
+  expect_equal(plot(es, limits = lim)$scales$get_scales("fill")$limits, lim)
+  expect_error(plot(es, limits = c(2, 1)), "limits")
+})

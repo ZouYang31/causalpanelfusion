@@ -34,6 +34,8 @@ methods of the paper.
   keeping their original values. `scfusion()` and `equi_confounding()`
   accept the result, and domain labels carry through to tables and plots.
   `simulate_fusion_data()` also returns its data in both layouts.
+* `plot()` for `eta_sensitivity()` takes `colours`, `limits`, `legend_title`
+  and `text_colour` to change the heat map's colour scale.
 * `inst/scripts/simulation_example.R` is a worked example on simulated data
   (following `main_example.R`): the full analysis of one data set, checked
   against the true effect.

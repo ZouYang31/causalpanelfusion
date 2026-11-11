@@ -464,6 +464,18 @@ plot.scfusion_rmspe <- function(x, treated_label = NULL,
 #' Heat map of the eta sensitivity analysis
 #' @param x An `"scfusion_eta"` object.
 #' @param value Column to display (default `"estimate"`).
+#' @param colours Colours of the scale, from the smallest to the largest
+#'   value: two colours for a simple gradient or more for a multi-step one,
+#'   e.g. `colours = c("white", "orange", "red")`.
+#' @param limits Optional range `c(low, high)` of the colour scale. By
+#'   default the scale stretches over the values shown, so even negligible
+#'   differences span the full range of colours; set e.g.
+#'   `limits = c(0, 5)` to colour the tiles on a fixed range instead (values
+#'   outside it are drawn grey).
+#' @param legend_title Title of the colour bar; defaults to the name of the
+#'   displayed column.
+#' @param text_colour Colour of the numbers printed in the tiles (use a
+#'   light colour on a dark scale).
 #' @param xlab,ylab Axis labels.
 #' @param legend_position As in [plot.scfusion()]; defaults to `"right"`
 #'   (outside), since an inside legend would cover tiles.
@@ -471,11 +483,24 @@ plot.scfusion_rmspe <- function(x, treated_label = NULL,
 #' @return A `ggplot` object.
 #' @export
 plot.scfusion_eta <- function(x, value = "estimate",
+                              colours = c("#EAF2FB", "#6BAED6"),
+                              limits = NULL,
+                              legend_title = value, text_colour = "black",
                               xlab = expression(eta[X]),
                               ylab = expression(eta[Z]),
                               legend_position = "right", ...) {
   if (!value %in% names(x)) {
     stop(sprintf("Column '%s' not found.", value), call. = FALSE)
+  }
+  if (!is.character(colours) || length(colours) < 2L || anyNA(colours)) {
+    stop("`colours` must be a vector of at least two colours ",
+         "(smallest to largest value).", call. = FALSE)
+  }
+  if (!is.null(limits) &&
+      (!is.numeric(limits) || length(limits) != 2L || anyNA(limits) ||
+       limits[1L] >= limits[2L])) {
+    stop("`limits` must be an increasing numeric c(low, high).",
+         call. = FALSE)
   }
   df <- data.frame(eta_X = factor(x$eta_X), eta_Z = factor(x$eta_Z),
                    value = x[[value]])
@@ -483,9 +508,9 @@ plot.scfusion_eta <- function(x, value = "estimate",
                                         fill = .data$value)) +
     ggplot2::geom_tile(colour = "white") +
     ggplot2::geom_text(ggplot2::aes(label = signif(.data$value, 3)),
-                       size = 4.5) +
-    ggplot2::scale_fill_gradient(low = "#EAF2FB", high = "#6BAED6",
-                                 name = value) +
+                       size = 4.5, colour = text_colour) +
+    ggplot2::scale_fill_gradientn(colours = colours, limits = limits,
+                                  name = legend_title) +
     ggplot2::labs(x = xlab, y = ylab) +
     .cpf_theme(legend_position)
   # the colour bar keeps its title (the displayed quantity)
