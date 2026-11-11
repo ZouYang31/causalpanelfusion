@@ -11,6 +11,7 @@
   limits = NULL,
   legend_title = value,
   text_colour = "black",
+  digits = NULL,
   xlab = expression(eta[X]),
   ylab = expression(eta[Z]),
   legend_position = "right",
@@ -37,6 +38,10 @@ displayed column.}
 
 \item{text_colour}{Colour of the numbers printed in the tiles (use a
 light colour on a dark scale).}
+
+\item{digits}{Number of decimal places for the numbers printed in the
+tiles, e.g. \code{digits = 3} shows 3.507. The default (\code{NULL}) shows three
+significant digits.}
 
 \item{xlab, ylab}{Axis labels.}
 

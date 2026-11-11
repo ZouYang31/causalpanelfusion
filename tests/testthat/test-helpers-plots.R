@@ -107,4 +107,8 @@ test_that("eta heat map colours and legend title can be changed", {
   expect_true(all(!is.na(d2$fill)))
   expect_equal(plot(es, limits = lim)$scales$get_scales("fill")$limits, lim)
   expect_error(plot(es, limits = c(2, 1)), "limits")
+  labs3 <- ggplot2::ggplot_build(plot(es, digits = 3))$data[[2]]$label
+  expect_equal(labs3, formatC(es$estimate, format = "f", digits = 3))
+  expect_true(all(grepl("\\.[0-9]{3}$", labs3)))
+  expect_error(plot(es, digits = -1), "digits")
 })

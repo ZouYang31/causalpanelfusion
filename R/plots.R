@@ -476,6 +476,9 @@ plot.scfusion_rmspe <- function(x, treated_label = NULL,
 #'   displayed column.
 #' @param text_colour Colour of the numbers printed in the tiles (use a
 #'   light colour on a dark scale).
+#' @param digits Number of decimal places for the numbers printed in the
+#'   tiles, e.g. `digits = 3` shows 3.507. The default (`NULL`) shows three
+#'   significant digits.
 #' @param xlab,ylab Axis labels.
 #' @param legend_position As in [plot.scfusion()]; defaults to `"right"`
 #'   (outside), since an inside legend would cover tiles.
@@ -486,6 +489,7 @@ plot.scfusion_eta <- function(x, value = "estimate",
                               colours = c("#EAF2FB", "#6BAED6"),
                               limits = NULL,
                               legend_title = value, text_colour = "black",
+                              digits = NULL,
                               xlab = expression(eta[X]),
                               ylab = expression(eta[Z]),
                               legend_position = "right", ...) {
@@ -502,12 +506,23 @@ plot.scfusion_eta <- function(x, value = "estimate",
     stop("`limits` must be an increasing numeric c(low, high).",
          call. = FALSE)
   }
+  if (!is.null(digits) &&
+      (!is.numeric(digits) || length(digits) != 1L || is.na(digits) ||
+       digits < 0 || digits != round(digits))) {
+    stop("`digits` must be a non-negative whole number of decimal places.",
+         call. = FALSE)
+  }
   df <- data.frame(eta_X = factor(x$eta_X), eta_Z = factor(x$eta_Z),
                    value = x[[value]])
+  df$label <- if (is.null(digits)) {
+    as.character(signif(df$value, 3))
+  } else {
+    formatC(df$value, format = "f", digits = digits)
+  }
   p <- ggplot2::ggplot(df, ggplot2::aes(x = .data$eta_X, y = .data$eta_Z,
                                         fill = .data$value)) +
     ggplot2::geom_tile(colour = "white") +
-    ggplot2::geom_text(ggplot2::aes(label = signif(.data$value, 3)),
+    ggplot2::geom_text(ggplot2::aes(label = .data$label),
                        size = 4.5, colour = text_colour) +
     ggplot2::scale_fill_gradientn(colours = colours, limits = limits,
                                   name = legend_title) +
