@@ -1,23 +1,44 @@
-Package: causalfusion
-Title: Causal Inference with Fusion Methods
-Version: 0.0.0.9000
-Authors@R: 
-    person("Zou", "Yang", email = "zoeyyang@bu.edu", role = c("aut", "cre"),
-           comment = c("equal contribution"))
-    person("Seung Hee", "Lee", email = "seunghee@bu.edu", role = c("aut", "cre"),
-           comment = c("equal contribution"))
-Description: Tools for implementing and optimizing synthetic control methods with fusion-style constraints using Gurobi and other solvers.
+Package: causalpanelfusion
+Title: Causal Data Fusion for Panel Data without a Pre-Intervention Period
+Version: 0.2.0
+Authors@R: c(
+    person("Zou", "Yang", email = "zou.yang.th@dartmouth.edu",
+           role = c("aut", "cre")),
+    person("Seung Hee", "Lee", email = "seunghee@bu.edu", role = "aut"))
+Description: Estimates the causal effect of an intervention on a single
+    treated unit when the target domain has no pre-intervention period, by
+    fusing panel data from a related reference domain observed for the same
+    units (Yang, Lee, Kohler and Ghassami, <doi:10.48550/arXiv.2410.16391>).
+    Implements synthetic control data fusion with data-driven constrained
+    weights, linear and logarithmic equi-confounding estimators, prediction
+    intervals that combine a bootstrap for the weight-construction error with
+    donor-placebo calibration of the transfer error, per-period prediction
+    bands, placebo and RMSPE-ratio tests, and sensitivity analyses. The
+    optimisation uses the free 'ECOS' conic solver by default; 'Gurobi' is
+    supported as an option.
 License: MIT + file LICENSE
-Encoding: UTF-8
-Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
+URL: https://github.com/ZouYang31/causalpanelfusion
+BugReports: https://github.com/ZouYang31/causalpanelfusion/issues
+Depends:
+    R (>= 4.1.0)
 Imports:
-  dplyr,
-  ggplot2,
-  gurobi,
-  kernlab,
-  stats,
-  scales,
-Suggests: 
+    ECOSolveR (>= 0.5.4),
+    ggplot2 (>= 3.4.0),
+    Matrix,
+    methods,
+    stats,
+    utils
+Suggests:
+    future,
+    future.apply,
+    gurobi,
+    kernlab,
+    knitr,
+    rmarkdown,
     testthat (>= 3.0.0)
+VignetteBuilder: knitr
 Config/testthat/edition: 3
+Encoding: UTF-8
+Language: en-US
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1

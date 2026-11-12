@@ -1,0 +1,259 @@
+---
+title: "Getting started with causalpanelfusion"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with causalpanelfusion}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7,
+                      fig.height = 4.2)
+```
+
+## The problem
+
+A single unit receives an intervention and we want its effect, but the
+outcome of interest (the **target domain**) is only observed *after* the
+intervention: there is no pre-intervention period to build a synthetic
+control from. What we do have is a related **reference domain** observed for
+the same units and untouched by the intervention (in the paper's
+application: vaccination rates of a different subpopulation of the same
+cities). `causalpanelfusion` fuses the two domains.
+
+The inputs are four matrices with one row per unit:
+
+| argument    | paper | content                                    |
+|-------------|-------|--------------------------------------------|
+| `target`    | $Y$   | target-domain outcomes (units × periods)    |
+| `reference` | $F$   | reference-domain outcomes (units × periods) |
+| `X`         | $X$   | target-domain covariates                    |
+| `Z`         | $Z$   | reference-domain covariates                 |
+
+We simulate data from the factor model used in the paper's simulation study
+(with a smaller budget grid below to keep the vignette fast).
+
+```{r}
+library(causalpanelfusion)
+sim <- simulate_fusion_data(n_units = 21, seed = 45)
+dim(sim$target)
+dim(sim$reference)
+sim$psi   # true average effect on the treated unit
+```
+
+## Synthetic control data fusion
+
+`scfusion()` learns donor weights in the reference domain with the paper's
+data-driven constrained optimisation: covariate balance in both domains is
+kept within a slack `eta_Z`, `eta_X` of the best attainable balance, and the
+budget $b = (b_F, b_Z, b_X)$ trading off the three fit criteria is selected
+from a grid. The weights are then transported to the target domain.
+
+```{r}
+fit <- scfusion(sim$target, sim$reference, X = sim$X, Z = sim$Z,
+                budget_step = 0.05)
+fit
+```
+
+`summary()` adds per-period effects, the selected budget, the fit criteria
+and a covariate-balance table.
+
+```{r}
+summary(fit)
+```
+
+```{r}
+plot(fit)                       # target domain
+plot(fit, type = "reference")   # reference domain (where weights are fit)
+```
+
+Plots are ggplot objects with the legend inside the panel. Labels, axis
+titles, limits, colours and the legend position can all be changed, and in a
+simulation the true counterfactual can be added:
+
+```{r}
+plot(fit, counterfactual = sim$target0[1, ],
+     treated_label = "observed target unit",
+     synthetic_label = "synthetic control target unit",
+     counterfactual_label = "counterfactual target unit",
+     donor_label = "donor pool units",
+     xlab = "Period", ylab = "Outcome in the target domain",
+     legend_position = "topleft")
+```
+
+`covariate_balance()` gives the covariate balance table: the treated unit,
+its synthetic control and the donor pool for every covariate in both
+domains, the rank of the treated unit among all units, and (in the footer)
+how the fitted discrepancies compare with the best attainable values and the
+limits allowed by `eta_Z` and `eta_X`.
+
+```{r}
+covariate_balance(fit)
+```
+
+When the weights are fitted on normalised covariates, pass the covariates in
+their original units through `X` and `Z` to report the table in those units;
+`compare` adds the synthetic values of other fits as extra columns:
+
+```{r}
+fit_tight <- scfusion(sim$target, sim$reference, X = sim$X, Z = sim$Z,
+                      eta_X = 0.01, budget_step = 0.05)
+covariate_balance(fit, compare = list(eta_X_0.01 = fit_tight))
+```
+
+The default grid (`budget_step = 0.01`, 4,796 candidates) matches the paper.
+The optimisation uses the free ECOS solver; `solver = "gurobi"` reproduces
+the original implementation if you have a Gurobi licence.
+
+## Prediction intervals
+
+`scfusion_pi()` decomposes the error into the weight-construction error
+(bootstrap refits of the whole algorithm in the reference domain) and the
+transfer error (calibrated from donor placebos in the target domain), and
+reports Approach 2 (location-scale, Gaussian and empirical) and Approach 1
+(sub-Gaussian) intervals at level `1 - alpha1 - alpha2`.
+
+```{r}
+pi <- scfusion_pi(fit, B = 100, seed = 1, progress = FALSE)
+pi
+```
+
+Use `B = 500` (the default) for reported results. Each refit repeats the
+budget search, so this is the slow step; run the refits in parallel with
+
+```{r, eval = FALSE}
+future::plan(future::multisession)
+pi <- scfusion_pi(fit, parallel = TRUE, seed = 1)
+```
+
+The results are identical to the serial run. `budget_step = 0.05` (refits
+only) or `reselect_budget = FALSE` give faster approximations.
+
+Pointwise per-period bands:
+
+```{r}
+bands <- pi_bands(pi, method = "gaussian")
+bands[, c("period", "treated", "synthetic", "total_lo", "total_hi",
+          "effect", "effect_lo", "effect_hi")]
+plot(pi)                      # bands on the synthetic control
+plot(pi, type = "effect")     # per-period effects
+```
+
+Because the transfer error is not identified nonparametrically,
+`sensitivity_pi()` traces the interval as its scale is multiplied by
+$\rho$:
+
+```{r}
+sens <- sensitivity_pi(pi)
+sens
+plot(sens)
+```
+
+## Diagnostics
+
+In-space placebos re-run the algorithm with every donor as a pseudo-treated
+unit; the RMSPE-ratio test turns them into an exact placebo p-value, using
+the reference-domain fit as the "pre-period".
+
+```{r}
+pl <- placebo_test(fit, progress = FALSE)
+plot(pl)
+rmspe_test(fit, progress = FALSE)
+```
+
+The leave-one-out check drops each positive-weight donor in turn:
+
+```{r}
+loo <- placebo_test(fit, type = "leave_one_out", progress = FALSE)
+loo
+```
+
+Sensitivity of the estimate to the balance slack:
+
+```{r}
+es <- eta_sensitivity(fit, eta_Z = c(0.05, 0.1, 0.2), eta_X = c(0.05, 0.1, 0.2),
+                      progress = FALSE)
+es[, c("eta_Z", "eta_X", "estimate", "NSE_F", "n_donors")]
+plot(es)
+```
+
+## Equi-confounding data fusion
+
+The paper's second method anchors the target-domain confounding bias at the
+reference-domain bias, either additively (linear) or multiplicatively
+(logarithmic):
+
+```{r}
+ec <- equi_confounding(sim$target, sim$reference)
+ec
+plot(ec)
+```
+
+## Using your own data
+
+`fusion_data()` builds the inputs from data frames, in either of two
+layouts, and `scfusion()` takes the result in place of the four matrices.
+The simulated data come in both layouts.
+
+**Domain as a column** (one row per unit, domain and period):
+
+```{r}
+head(sim$long)
+fd <- fusion_data(sim$long, unit = "unit", time = "time", treated = "treated",
+                  domain = "domain", target = "target", reference = "reference",
+                  outcome = "outcome", covariates = c("cov1", "cov2", "cov3"))
+fd
+```
+
+**Domains as columns** (one row per unit and period); the target outcome is
+missing before the target domain is observed, and those periods are dropped
+automatically:
+
+```{r}
+head(sim$wide[sim$wide$time >= 15, ])
+fd_wide <- fusion_data(sim$wide, unit = "unit", time = "time",
+                       treated = "treated",
+                       outcome = c(target = "y_target",
+                                   reference = "y_reference"),
+                       covariates = list(target = c("X1", "X2", "X3"),
+                                         reference = c("Z1", "Z2", "Z3")))
+```
+
+Covariates are min-max normalised across the units in the analysis by
+default, as in the paper, and their original values are kept, so
+`covariate_balance()` reports them in their own units:
+
+```{r}
+fit_fd <- scfusion(fd, budget_step = 0.05)
+covariate_balance(fit_fd)
+```
+
+Other options:
+
+- `covariate_data` reads the covariates from a separate table.
+- `donors` restricts the donor pool.
+- `target_periods` and `reference_periods` select the periods used in each
+  domain.
+- `covariate_time` and `covariate_summary` handle covariates that change over
+  time.
+- `drop_incomplete = TRUE` drops donors with missing data. By default they
+  cause an error that lists the missing values.
+
+For example, with outcomes in long format and covariates in a separate table
+with one row per city and domain-specific columns:
+
+```{r, eval = FALSE}
+fd <- fusion_data(vac, unit = "city", time = "month", treated = "Chelsea",
+                  domain = "race", target = "Hispanic", reference = "Black",
+                  outcome = "rate",
+                  covariates = list(target    = c("income_hisp", "share_hisp"),
+                                    reference = c("income_blk", "share_blk")),
+                  covariate_data = city_covariates,
+                  donors = my_donor_cities)
+```
+
+## Reference
+
+Yang, Z., Lee, S. H., Köhler, J. R. and Ghassami, A. Causal data fusion for
+panel data without a pre-intervention period. arXiv:2410.16391.
